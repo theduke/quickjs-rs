@@ -4,6 +4,15 @@ A Rust wrapper for [quickjs](https://bellard.org/quickjs/), a Javascript engine.
 
 This crate allows you to easily run ES2019 based Javascript code from a Rust context.
 
+## Limitations
+
+There are some limitations due to the early state of `quickjs` and a incomplete 
+C API:
+
+* Parse errors/ Exceptions in Javascript code are currently only reported as a "Unknown Exception"
+* JS objects can not be deserialized into Rust (JsValue::Object) due to a missing API
+* Invoking callbacks from Javascript with an invalid number of arguments causes a SIGKILL.
+
 ## Installation
 
 
