@@ -3,6 +3,7 @@ mod value;
 
 use std::{convert::TryFrom, error, fmt};
 
+pub use bindings::Callback;
 pub use value::*;
 
 #[derive(PartialEq, Debug)]
@@ -62,12 +63,15 @@ impl Context {
         })
     }
 
+    // Evaluates Javascript code and returns the value of the final expression.
     pub fn eval(&self, code: &str) -> Result<JsValue, ExecutionError> {
         let value_raw = self.wrapper.eval(code)?;
         let value = value_raw.to_value()?;
         Ok(value)
     }
 
+    /// Evaluates Javascript code and returns the value of the final expression
+    /// as a Rust type.
     pub fn eval_as<R>(&self, code: &str) -> Result<R, ExecutionError>
     where
         R: TryFrom<JsValue>,
@@ -79,6 +83,7 @@ impl Context {
         Ok(ret)
     }
 
+    /// Call a global function in the Javascript namespace.
     pub fn call_function(
         &self,
         function_name: &str,
@@ -103,15 +108,7 @@ impl Context {
         Ok(value)
     }
 
-    pub fn add_function<'a>(
-        &'a self,
-        name: &str,
-        argcount: i32,
-        f: impl Fn(Vec<JsValue>) -> JsValue + Clone + 'static,
-    ) -> Result<(), ExecutionError> {
-        self.wrapper.add_function(name, argcount, f)
-    }
-
+    /// Add a global JS function that is backed by a Rust function or closure.
     pub fn add_callback<F>(
         &self,
         name: &str,

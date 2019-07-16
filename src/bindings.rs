@@ -10,6 +10,8 @@ use quickjs_sys as q;
 
 use crate::{ContextError, ExecutionError, JsValue, ValueError};
 
+// JS_TAG_* constants from quickjs.
+// For some reason bindgen does not pick them up.
 const TAG_STRING: i64 = -7;
 const TAG_OBJECT: i64 = -1;
 const TAG_INT: i64 = 0;
@@ -19,29 +21,42 @@ const TAG_UNDEFINED: i64 = 3;
 const TAG_EXCEPTION: i64 = 6;
 const TAG_FLOAT64: i64 = 7;
 
+/// Free a JSValue.
+/// This function is the equivalent of JS_FreeValue from quickjs, which can not
+/// be used due to being `static inline`.
+unsafe fn free_value(context: *mut q::JSContext, value: q::JSValue) {
+    // All tags < 0 are garbage collected and need to be freed.
+    if value.tag < 0 {
+        // This transmute is OK since if tag < 0, the union will be a refcount
+        // pointer.
+        let ptr = std::mem::transmute::<_, *mut q::JSRefCountHeader>(value.u.ptr);
+        let pref: &mut q::JSRefCountHeader = &mut *ptr;
+        pref.ref_count -= 1;
+        if pref.ref_count <= 0 {
+            q::__JS_FreeValue(context, value);
+        }
+    }
+}
+
+/// Helper for creating CStrings.
 fn make_cstring(value: impl Into<Vec<u8>>) -> Result<CString, ValueError> {
     CString::new(value).map_err(ValueError::StringWithZeroBytes)
 }
 
-// type CallbackFn = Box<dyn Fn(Vec<q::JSValue>) -> q::JSValue>;
-
+/// The Callback trait is implemented for functions/closures that can be
+/// used as callbacks in the JS runtime.
 pub trait Callback<F> {
-    type Input;
-    type Output;
-
     fn argument_count(&self) -> usize;
     fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError>;
 }
 
+// Implement Callback for Fn(A) -> R functions.
 impl<A1, R, F> Callback<PhantomData<(&A1, &R, &F)>> for F
 where
     A1: TryFrom<JsValue, Error = ValueError>,
     R: Into<JsValue>,
     F: Fn(A1) -> R + Sized,
 {
-    type Input = A1;
-    type Output = R;
-
     fn argument_count(&self) -> usize {
         1
     }
@@ -53,6 +68,7 @@ where
     }
 }
 
+// Implement Callback for Fn(A1, A2) -> R functions.
 impl<A1, A2, R, F> Callback<PhantomData<(&A1, &A2, &R, &F)>> for F
 where
     A1: TryFrom<JsValue, Error = ValueError>,
@@ -60,9 +76,6 @@ where
     R: Into<JsValue>,
     F: Fn(A1, A2) -> R + Sized,
 {
-    type Input = A1;
-    type Output = R;
-
     fn argument_count(&self) -> usize {
         1
     }
@@ -80,6 +93,7 @@ where
     }
 }
 
+// Implement Callback for Fn(A1, A2, A3) -> R functions.
 impl<A1, A2, A3, R, F> Callback<PhantomData<(&A1, &A2, &A3, &R, &F)>> for F
 where
     A1: TryFrom<JsValue, Error = ValueError>,
@@ -88,9 +102,6 @@ where
     R: Into<JsValue>,
     F: Fn(A1, A2, A3) -> R + Sized,
 {
-    type Input = A1;
-    type Output = R;
-
     fn argument_count(&self) -> usize {
         1
     }
@@ -111,24 +122,17 @@ where
     }
 }
 
-type WrappedCallback = Fn(c_int, *mut q::JSValue) -> q::JSValue;
+type WrappedCallback = dyn Fn(c_int, *mut q::JSValue) -> q::JSValue;
 
 /// Taken from: https://s3.amazonaws.com/temp.michaelfbryan.com/callbacks/index.html
 ///
-/// Unpack a Rust closure, extracting a `void*` pointer to the data and a
-/// trampoline function which can be used to invoke it.
+/// Create a C wrapper function for a Rust closure to enable using it as a
+/// callback function in the Quickjs runtime.
 ///
-/// # Safety
+/// Both the boxed closure and the boxed data are returned and must be stored
+/// by the caller to guarantee they stay alive.
 ///
-/// It is the user's responsibility to ensure the closure outlives the returned
-/// `void*` pointer.
-///
-/// Calling the trampoline function with anything except the `void*` pointer
-/// will result in *Undefined Behaviour*.
-///
-/// The closure should guarantee that it never panics, seeing as panicking
-/// across the FFI barrier is *Undefined Behaviour*. You may find
-/// `std::panic::catch_unwind()` useful.
+/// TODO: use catch_unwind to prevent pancis.
 unsafe fn build_closure_trampoline<F>(
     closure: F,
 ) -> ((Box<WrappedCallback>, Box<q::JSValue>), q::JSCFunctionData)
@@ -163,117 +167,19 @@ where
     ((boxed_f, data), Some(trampoline::<F>))
 }
 
-/// Free a JSValue.
-/// This function is the equivalent of JS_FreeValue from quickjs, which can not
-/// be used due to being `static inline`.
-unsafe fn free_value(context: *mut q::JSContext, mut value: q::JSValue) {
-    // All tags < 0 are garbage collected and need to be freed.
-    if value.tag < 0 {
-        // This transmute is OK since if tag < 0, the union will be a refcount
-        // pointer.
-        let ptr = std::mem::transmute::<_, *mut q::JSRefCountHeader>(value.u.ptr);
-        let pref: &mut q::JSRefCountHeader = &mut *ptr;
-        pref.ref_count -= 1;
-        if pref.ref_count <= 0 {
-            q::__JS_FreeValue(context, value);
-        }
-    }
-}
-
-pub fn to_value(ctx: &ContextWrapper, value: &q::JSValue) -> Result<JsValue, ValueError> {
-    let context = ctx.context;
-    let r = value;
-
-    match r.tag {
-        // Int.
-        TAG_INT => {
-            let val = unsafe { r.u.int32 };
-            Ok(JsValue::Int(val))
-        }
-        // Bool.
-        TAG_BOOL => {
-            let raw = unsafe { r.u.int32 };
-            let val = raw > 0;
-            Ok(JsValue::Bool(val))
-        }
-        // Null.
-        TAG_NULL => Ok(JsValue::Null),
-        // Undefined.
-        TAG_UNDEFINED => Ok(JsValue::Null),
-        // Float.
-        TAG_FLOAT64 => {
-            let val = unsafe { r.u.float64 };
-            Ok(JsValue::Float(val))
-        }
-        // String.
-        TAG_STRING => {
-            let ptr =
-                unsafe { q::JS_ToCStringLen(context, std::ptr::null::<i32>() as *mut i32, *r, 0) };
-
-            if ptr == std::ptr::null() {
-                return Err(ValueError::Internal(
-                    "Could not convert string: got a null pointer".into(),
-                ));
-            }
-
-            let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
-
-            let s = cstr
-                .to_str()
-                .map_err(|e| ValueError::InvalidString(e))?
-                .to_string();
-
-            // Free the c string.
-            unsafe { q::JS_FreeCString(context, ptr) };
-
-            Ok(JsValue::String(s))
-        }
-        // Object.
-        TAG_OBJECT => {
-            let is_array = unsafe { q::JS_IsArray(context, *r) } > 0;
-            if is_array {
-                let length_name = make_cstring("length")?;
-
-                let len_value = unsafe {
-                    let raw = q::JS_GetPropertyStr(context, *r, length_name.as_ptr());
-                    let wrapped = OwnedValueRef::new(ctx, raw);
-                    let len = wrapped.to_value()?;
-                    len
-                };
-                let len = if let JsValue::Int(x) = len_value {
-                    x
-                } else {
-                    return Err(ValueError::Internal(
-                        "Could not determine arrya length".into(),
-                    ));
-                };
-
-                let mut values = Vec::new();
-                for index in 0..(len as usize) {
-                    let value_raw = unsafe { q::JS_GetPropertyUint32(context, *r, index as u32) };
-                    let value_ref = OwnedValueRef::new(ctx, value_raw);
-                    if value_ref.value.tag == TAG_EXCEPTION {
-                        return Err(ValueError::Internal("Could not build array".into()));
-                    }
-                    let value = value_ref.to_value()?;
-                    values.push(value);
-                }
-
-                Ok(JsValue::Array(values))
-            } else {
-                Err(ValueError::Internal("Unsupported JS type: Object".into()))
-            }
-        }
-        x => Err(ValueError::Internal(format!(
-            "Unhandled JS_TAG value: {}",
-            x
-        ))),
-    }
-}
-
+/// OwnedValueRef wraps a Javascript value from the quickjs runtime.
+/// It prevents leaks by ensuring that the inner value is deallocated on drop.
 pub struct OwnedValueRef<'a> {
     context: &'a ContextWrapper,
     value: q::JSValue,
+}
+
+impl<'a> Drop for OwnedValueRef<'a> {
+    fn drop(&mut self) {
+        unsafe {
+            free_value(self.context.context, self.value);
+        }
+    }
 }
 
 impl<'a> OwnedValueRef<'a> {
@@ -282,6 +188,8 @@ impl<'a> OwnedValueRef<'a> {
     }
 
     /// Get the inner JSValue without freeing in drop.
+    ///
+    /// Unsafe because the caller is responsible for freeing the value.
     unsafe fn into_inner(mut self) -> q::JSValue {
         let v = self.value;
         self.value = q::JSValue {
@@ -322,18 +230,12 @@ impl<'a> OwnedValueRef<'a> {
     }
 
     pub fn to_value(&self) -> Result<JsValue, ValueError> {
-        self::to_value(self.context, &self.value)
+        self.context.to_value(&self.value)
     }
 }
 
-impl<'a> Drop for OwnedValueRef<'a> {
-    fn drop(&mut self) {
-        unsafe {
-            free_value(self.context.context, self.value);
-        }
-    }
-}
-
+/// Wraps an object from the quickjs runtime.
+/// Provides convenience property accessors.
 pub struct OwnedObjectRef<'a> {
     value: OwnedValueRef<'a>,
 }
@@ -370,14 +272,12 @@ impl<'a> OwnedObjectRef<'a> {
 
     unsafe fn set_property_raw(&self, name: &str, value: q::JSValue) -> Result<(), ExecutionError> {
         let cname = make_cstring(name)?;
-        let ret = unsafe {
-            q::JS_SetPropertyStr(
-                self.value.context.context,
-                self.value.value,
-                cname.as_ptr(),
-                value,
-            )
-        };
+        let ret = q::JS_SetPropertyStr(
+            self.value.context.context,
+            self.value.value,
+            cname.as_ptr(),
+            value,
+        );
         if ret < 0 {
             Err(ExecutionError::Exception("Could not set property".into()))
         } else {
@@ -391,8 +291,14 @@ impl<'a> OwnedObjectRef<'a> {
     }
 }
 
+/// Wraps a quickjs context.
+///
+/// Cleanup of the context happens in drop.
 pub struct ContextWrapper {
     context: *mut q::JSContext,
+    /// Stores callback closures and quickjs data pointers.
+    /// This array is write-only and only exists to ensure the lifetime of
+    /// the closure.
     callbacks: RefCell<Vec<(Box<WrappedCallback>, Box<q::JSValue>)>>,
 }
 
@@ -423,6 +329,7 @@ impl ContextWrapper {
         })
     }
 
+    /// Serialize a Rust value into a quickjs runtime value.
     pub fn serialize_value<'a>(&'a self, value: JsValue) -> Result<OwnedValueRef<'a>, ValueError> {
         let context = self.context;
         let v = match value {
@@ -445,9 +352,7 @@ impl ContextWrapper {
                 tag: TAG_FLOAT64,
             },
             JsValue::String(val) => {
-                let len = val.len();
                 let cstr = make_cstring(val)?;
-
                 let qval = unsafe { q::JS_NewString(context, cstr.as_ptr()) };
 
                 if qval.tag == TAG_EXCEPTION {
@@ -538,6 +443,100 @@ impl ContextWrapper {
         Ok(OwnedValueRef::new(self, v))
     }
 
+    // Deserialize a quickjs runtime value into a Rust value.
+    fn to_value(&self, value: &q::JSValue) -> Result<JsValue, ValueError> {
+        let context = self.context;
+        let r = value;
+
+        match r.tag {
+            // Int.
+            TAG_INT => {
+                let val = unsafe { r.u.int32 };
+                Ok(JsValue::Int(val))
+            }
+            // Bool.
+            TAG_BOOL => {
+                let raw = unsafe { r.u.int32 };
+                let val = raw > 0;
+                Ok(JsValue::Bool(val))
+            }
+            // Null.
+            TAG_NULL => Ok(JsValue::Null),
+            // Undefined.
+            TAG_UNDEFINED => Ok(JsValue::Null),
+            // Float.
+            TAG_FLOAT64 => {
+                let val = unsafe { r.u.float64 };
+                Ok(JsValue::Float(val))
+            }
+            // String.
+            TAG_STRING => {
+                let ptr = unsafe {
+                    q::JS_ToCStringLen(context, std::ptr::null::<i32>() as *mut i32, *r, 0)
+                };
+
+                if ptr == std::ptr::null() {
+                    return Err(ValueError::Internal(
+                        "Could not convert string: got a null pointer".into(),
+                    ));
+                }
+
+                let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
+
+                let s = cstr
+                    .to_str()
+                    .map_err(|e| ValueError::InvalidString(e))?
+                    .to_string();
+
+                // Free the c string.
+                unsafe { q::JS_FreeCString(context, ptr) };
+
+                Ok(JsValue::String(s))
+            }
+            // Object.
+            TAG_OBJECT => {
+                let is_array = unsafe { q::JS_IsArray(context, *r) } > 0;
+                if is_array {
+                    let length_name = make_cstring("length")?;
+
+                    let len_value = unsafe {
+                        let raw = q::JS_GetPropertyStr(context, *r, length_name.as_ptr());
+                        let wrapped = OwnedValueRef::new(self, raw);
+                        let len = wrapped.to_value()?;
+                        len
+                    };
+                    let len = if let JsValue::Int(x) = len_value {
+                        x
+                    } else {
+                        return Err(ValueError::Internal(
+                            "Could not determine arrya length".into(),
+                        ));
+                    };
+
+                    let mut values = Vec::new();
+                    for index in 0..(len as usize) {
+                        let value_raw =
+                            unsafe { q::JS_GetPropertyUint32(context, *r, index as u32) };
+                        let value_ref = OwnedValueRef::new(self, value_raw);
+                        if value_ref.value.tag == TAG_EXCEPTION {
+                            return Err(ValueError::Internal("Could not build array".into()));
+                        }
+                        let value = value_ref.to_value()?;
+                        values.push(value);
+                    }
+
+                    Ok(JsValue::Array(values))
+                } else {
+                    Err(ValueError::Internal("Unsupported JS type: Object".into()))
+                }
+            }
+            x => Err(ValueError::Internal(format!(
+                "Unhandled JS_TAG value: {}",
+                x
+            ))),
+        }
+    }
+
     /// Get the global object.
     pub fn global<'a>(&'a self) -> Result<OwnedObjectRef<'a>, ExecutionError> {
         let global_raw = unsafe { q::JS_GetGlobalObject(self.context) };
@@ -546,6 +545,9 @@ impl ContextWrapper {
         Ok(global)
     }
 
+    /// Get the last exception.
+    /// NOTE: currently this is useless in eval, since the exception is
+    /// swallowed.
     fn get_exception<'a>(&'a self) -> Result<OwnedValueRef<'a>, ExecutionError> {
         let raw = unsafe { q::JS_GetException(self.context) };
         let value = OwnedValueRef::new(self, raw);
@@ -558,6 +560,7 @@ impl ContextWrapper {
         }
     }
 
+    /// Evaluate javascript code.
     pub fn eval<'a>(&'a self, code: &str) -> Result<OwnedValueRef<'a>, ExecutionError> {
         let filename = "script.js";
         let filename_c = make_cstring(filename)?;
@@ -586,6 +589,7 @@ impl ContextWrapper {
         }
     }
 
+    /// Call a JS function with the given arguments.
     pub fn call_function<'a>(
         &'a self,
         function: OwnedValueRef<'a>,
@@ -620,63 +624,8 @@ impl ContextWrapper {
         }
     }
 
-    pub fn add_function<'a>(
-        &'a self,
-        name: &str,
-        argcount: i32,
-        f: impl Fn(Vec<JsValue>) -> JsValue + Clone + 'static,
-    ) -> Result<(), ExecutionError> {
-        let self_ptr = unsafe { self as *const ContextWrapper };
-
-        let wrapper = move |argc: c_int, argv: *mut q::JSValue| -> q::JSValue {
-            let ctx: &ContextWrapper = unsafe { &*self_ptr };
-
-            match ctx.exec_callback(argc, argv, &f) {
-                Ok(value) => unsafe { value.into_inner() },
-                Err(e) => q::JSValue {
-                    u: q::JSValueUnion { int32: 0 },
-                    tag: TAG_EXCEPTION,
-                },
-            }
-        };
-
-        let (pair, trampoline) = unsafe { build_closure_trampoline(wrapper) };
-        let data = (&*pair.1) as *const q::JSValue as *mut q::JSValue;
-        self.callbacks.borrow_mut().push(pair);
-
-        let cfunc =
-            unsafe { q::JS_NewCFunctionData(self.context, trampoline, argcount, 0, 1, data) };
-        if cfunc.tag != TAG_OBJECT {
-            return Err(ExecutionError::Internal("Could not create callback".into()));
-        }
-
-        let global = self.global()?;
-        unsafe {
-            global.set_property_raw(name, cfunc)?;
-        }
-
-        Ok(())
-    }
-
-    fn exec_callback<'a>(
-        &'a self,
-        argc: c_int,
-        argv: *mut q::JSValue,
-        f: &impl Fn(Vec<JsValue>) -> JsValue,
-    ) -> Result<OwnedValueRef<'a>, ExecutionError> {
-        let arg_slice = unsafe { std::slice::from_raw_parts(argv, argc as usize) };
-
-        let args = arg_slice
-            .iter()
-            .map(|raw| to_value(self, raw))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let output = f(args);
-        let serialized = self.serialize_value(output)?;
-        Ok(serialized)
-    }
-
-    fn exec_callback2<'a, F>(
+    /// Helper for executing a callback closure.
+    fn exec_callback<'a, F>(
         &'a self,
         argc: c_int,
         argv: *mut q::JSValue,
@@ -686,7 +635,7 @@ impl ContextWrapper {
 
         let args = arg_slice
             .iter()
-            .map(|raw| to_value(self, raw))
+            .map(|raw| self.to_value(raw))
             .collect::<Result<Vec<_>, _>>()?;
 
         match callback.call(args) {
@@ -694,26 +643,29 @@ impl ContextWrapper {
                 let serialized = self.serialize_value(result)?;
                 Ok(serialized)
             }
-            Ok(Err(e)) => Err(ExecutionError::Internal("Function execution failed".into())),
+            // TODO: better error reporting.
+            Ok(Err(_e)) => Err(ExecutionError::Internal("Function execution failed".into())),
             Err(e) => Err(e.into()),
         }
     }
 
+    /// Add a global JS function that is backed by a Rust function or closure.
     pub fn add_callback<'a, F>(
         &'a self,
         name: &str,
         callback: impl Callback<F> + 'static,
     ) -> Result<(), ExecutionError> {
-        let self_ptr = unsafe { self as *const ContextWrapper };
+        let self_ptr = self as *const ContextWrapper;
 
         let argcount = callback.argument_count() as i32;
 
         let wrapper = move |argc: c_int, argv: *mut q::JSValue| -> q::JSValue {
             let ctx: &ContextWrapper = unsafe { &*self_ptr };
 
-            match ctx.exec_callback2(argc, argv, &callback) {
+            match ctx.exec_callback(argc, argv, &callback) {
                 Ok(value) => unsafe { value.into_inner() },
-                Err(e) => q::JSValue {
+                // TODO: better error reporting.
+                Err(_) => q::JSValue {
                     u: q::JSValueUnion { int32: 0 },
                     tag: TAG_EXCEPTION,
                 },
