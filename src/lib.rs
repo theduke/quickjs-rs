@@ -1,13 +1,7 @@
 mod bindings;
 mod value;
 
-use std::{
-    error,
-    ffi::{CStr, CString},
-    fmt,
-};
-
-use quickjs_sys as q;
+use std::{convert::TryFrom, error, fmt};
 
 pub use value::*;
 
@@ -72,6 +66,17 @@ impl Context {
         let value_raw = self.wrapper.eval(code)?;
         let value = value_raw.to_value()?;
         Ok(value)
+    }
+
+    pub fn eval_as<R>(&self, code: &str) -> Result<R, ExecutionError>
+    where
+        R: TryFrom<JsValue>,
+        R::Error: Into<ValueError>,
+    {
+        let value_raw = self.wrapper.eval(code)?;
+        let value = value_raw.to_value()?;
+        let ret = R::try_from(value).map_err(|e| e.into())?;
+        Ok(ret)
     }
 
     pub fn call_function(
@@ -160,6 +165,12 @@ mod tests {
         for (code, res) in cases.into_iter() {
             assert_eq!(c.eval(code), res,);
         }
+
+        assert_eq!(c.eval_as::<bool>("true").unwrap(), true,);
+        assert_eq!(c.eval_as::<i32>("1 + 2").unwrap(), 3,);
+
+        let value: String = c.eval_as("var x = 44; x.toString()").unwrap();
+        assert_eq!(&value, "44");
     }
 
     #[test]

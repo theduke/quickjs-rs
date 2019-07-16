@@ -125,6 +125,14 @@ pub enum ValueError {
     UnexpectedType,
 }
 
+// TODO: remove this once either the Never type get's stabilized or the compiler
+// can properly handle Infallible.
+impl From<std::convert::Infallible> for ValueError {
+    fn from(_: std::convert::Infallible) -> Self {
+        unreachable!()
+    }
+}
+
 impl fmt::Display for ValueError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use ValueError::*;
