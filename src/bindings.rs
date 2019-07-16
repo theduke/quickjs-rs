@@ -1,9 +1,10 @@
 use std::{
-    cell::RefCell,
+    sync::Mutex,
     convert::TryFrom,
     ffi::CString,
     marker::PhantomData,
     os::raw::{c_int, c_void},
+    panic::RefUnwindSafe,
 };
 
 use quickjs_sys as q;
@@ -45,9 +46,29 @@ fn make_cstring(value: impl Into<Vec<u8>>) -> Result<CString, ValueError> {
 
 /// The Callback trait is implemented for functions/closures that can be
 /// used as callbacks in the JS runtime.
-pub trait Callback<F> {
+pub trait Callback<F>: RefUnwindSafe {
     fn argument_count(&self) -> usize;
     fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError>;
+}
+
+// Implement Callback for Fn(A) -> R functions.
+impl<R, F> Callback<PhantomData<(&R, &F)>> for F
+where
+    R: Into<JsValue>,
+    F: Fn() -> R + Sized + RefUnwindSafe,
+{
+    fn argument_count(&self) -> usize {
+        0
+    }
+
+    fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
+        if args.len() != 0 {
+            return Ok(Err(format!("Invalid argument count: Expected 0, got {}", args.len())));
+        }
+
+        let res = self().into();
+        Ok(Ok(res))
+    }
 }
 
 // Implement Callback for Fn(A) -> R functions.
@@ -55,12 +76,16 @@ impl<A1, R, F> Callback<PhantomData<(&A1, &R, &F)>> for F
 where
     A1: TryFrom<JsValue, Error = ValueError>,
     R: Into<JsValue>,
-    F: Fn(A1) -> R + Sized,
+    F: Fn(A1) -> R + Sized + RefUnwindSafe,
 {
     fn argument_count(&self) -> usize {
         1
     }
     fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
+        if args.len() != 1 {
+            return Ok(Err(format!("Invalid argument count: Expected 1, got {}", args.len())));
+        }
+
         let arg_raw = args.into_iter().next().expect("Invalid argument count");
         let arg = A1::try_from(arg_raw)?;
         let res = self(arg).into();
@@ -74,13 +99,17 @@ where
     A1: TryFrom<JsValue, Error = ValueError>,
     A2: TryFrom<JsValue, Error = ValueError>,
     R: Into<JsValue>,
-    F: Fn(A1, A2) -> R + Sized,
+    F: Fn(A1, A2) -> R + Sized + RefUnwindSafe,
 {
     fn argument_count(&self) -> usize {
         1
     }
 
     fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
+        if args.len() != 2 {
+            return Ok(Err(format!("Invalid argument count: Expected 2, got {}", args.len())));
+        }
+
         let mut iter = args.into_iter();
         let arg1_raw = iter.next().expect("Invalid argument count");
         let arg1 = A1::try_from(arg1_raw)?;
@@ -100,13 +129,17 @@ where
     A2: TryFrom<JsValue, Error = ValueError>,
     A3: TryFrom<JsValue, Error = ValueError>,
     R: Into<JsValue>,
-    F: Fn(A1, A2, A3) -> R + Sized,
+    F: Fn(A1, A2, A3) -> R + Sized + RefUnwindSafe,
 {
     fn argument_count(&self) -> usize {
         1
     }
 
     fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
+        if args.len() != 3 {
+            return Ok(Err(format!("Invalid argument count: Expected 3, got {}", args.len())));
+        }
+
         let mut iter = args.into_iter();
         let arg1_raw = iter.next().expect("Invalid argument count");
         let arg1 = A1::try_from(arg1_raw)?;
@@ -299,7 +332,8 @@ pub struct ContextWrapper {
     /// Stores callback closures and quickjs data pointers.
     /// This array is write-only and only exists to ensure the lifetime of
     /// the closure.
-    callbacks: RefCell<Vec<(Box<WrappedCallback>, Box<q::JSValue>)>>,
+    // A Mutex is used over a RefCell because it needs to be unwind-safe.
+    callbacks: Mutex<Vec<(Box<WrappedCallback>, Box<q::JSValue>)>>,
 }
 
 impl Drop for ContextWrapper {
@@ -325,7 +359,7 @@ impl ContextWrapper {
 
         Ok(Self {
             context,
-            callbacks: RefCell::new(Vec::new()),
+            callbacks: Mutex::new(Vec::new()),
         })
     }
 
@@ -631,21 +665,31 @@ impl ContextWrapper {
         argv: *mut q::JSValue,
         callback: &impl Callback<F>,
     ) -> Result<OwnedValueRef<'a>, ExecutionError> {
-        let arg_slice = unsafe { std::slice::from_raw_parts(argv, argc as usize) };
 
-        let args = arg_slice
-            .iter()
-            .map(|raw| self.to_value(raw))
-            .collect::<Result<Vec<_>, _>>()?;
+        let result = std::panic::catch_unwind(|| {
+            let arg_slice = unsafe { std::slice::from_raw_parts(argv, argc as usize) };
 
-        match callback.call(args) {
-            Ok(Ok(result)) => {
-                let serialized = self.serialize_value(result)?;
-                Ok(serialized)
+            let args = arg_slice
+                .iter()
+                .map(|raw| self.to_value(raw))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            match callback.call(args) {
+                Ok(Ok(result)) => {
+                    let serialized = self.serialize_value(result)?;
+                    Ok(serialized)
+                }
+                // TODO: better error reporting.
+                Ok(Err(e)) => Err(ExecutionError::Internal(e.to_string())),
+                Err(e) => Err(e.into()),
             }
-            // TODO: better error reporting.
-            Ok(Err(_e)) => Err(ExecutionError::Internal("Function execution failed".into())),
-            Err(e) => Err(e.into()),
+        });
+
+        match result {
+            Ok(r) => r,
+            Err(e) => {
+                Err(ExecutionError::Internal(format!("Callback panicked!")))
+            }
         }
     }
 
@@ -665,16 +709,25 @@ impl ContextWrapper {
             match ctx.exec_callback(argc, argv, &callback) {
                 Ok(value) => unsafe { value.into_inner() },
                 // TODO: better error reporting.
-                Err(_) => q::JSValue {
-                    u: q::JSValueUnion { int32: 0 },
-                    tag: TAG_EXCEPTION,
-                },
+                Err(e) => {
+                    let js_exception = ctx
+                        .serialize_value(e.to_string().into())
+                        .unwrap();
+                    unsafe {
+                        q::JS_Throw(ctx.context, js_exception.into_inner());
+                    }
+
+                    q::JSValue {
+                        u: q::JSValueUnion { int32: 0 },
+                        tag: TAG_EXCEPTION,
+                    }
+                }
             }
         };
 
         let (pair, trampoline) = unsafe { build_closure_trampoline(wrapper) };
         let data = (&*pair.1) as *const q::JSValue as *mut q::JSValue;
-        self.callbacks.borrow_mut().push(pair);
+        self.callbacks.lock().unwrap().push(pair);
 
         let cfunc =
             unsafe { q::JS_NewCFunctionData(self.context, trampoline, argcount, 0, 1, data) };

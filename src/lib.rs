@@ -249,4 +249,18 @@ mod tests {
             .unwrap();
         assert_eq!(c.eval("add2(5, 11)").unwrap(), JsValue::Int(16),);
     }
+
+    #[test]
+    fn test_callback_invalid_argcount() {
+        let c = Context::new().unwrap();
+
+        c.add_callback("cb", |a: i32, b: i32| a + b).unwrap(); 
+
+        assert_eq!(
+            c.eval(" cb(5) "),
+            Err(ExecutionError::Exception(
+                "Internal error: Invalid argument count: Expected 2, got 1".into()
+            )),
+        );
+    }
 }
