@@ -1,0 +1,10 @@
+[package]
+name = "quickjs-sys"
+version = "0.1.0"
+authors = ["Christoph Herzog <chris@theduke.at>"]
+edition = "2018"
+
+build = "build.rs"
+
+[build-dependencies]
+bindgen = "0.50.0"

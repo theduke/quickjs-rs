@@ -1,0 +1,13 @@
+[package]
+name = "quickjs"
+version = "0.1.0"
+authors = ["Christoph Herzog <chris@theduke.at>"]
+edition = "2018"
+
+[dependencies]
+quickjs-sys = { version = "0.1", path = "./quickjs-sys" }
+
+[workspace]
+members = [
+    "quickjs-sys",
+]

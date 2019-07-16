@@ -1,0 +1,144 @@
+use std::{collections::HashMap, error, fmt};
+
+/// A value that can be (de)serialized to/from the quickjs runtime.
+#[derive(PartialEq, Clone, Debug)]
+pub enum JsValue {
+    Null,
+    Bool(bool),
+    Int(i32),
+    Float(f64),
+    String(String),
+    Array(Vec<JsValue>),
+    Object(HashMap<String, JsValue>),
+}
+
+impl JsValue {
+    pub fn into_string(self) -> Option<String> {
+        match self {
+            JsValue::String(s) => Some(s),
+            _ => None,
+        }
+    }
+}
+
+macro_rules! value_impl_from {
+    (
+        (
+            $(  $t1:ty => $var1:ident, )*
+        )
+        (
+            $( $t2:ty => |$exprname:ident| $expr:expr => $var2:ident, )*
+        )
+    ) => {
+        $(
+            impl From<$t1> for JsValue {
+                fn from(value: $t1) -> Self {
+                    JsValue::$var1(value)
+                }
+            }
+
+            impl std::convert::TryFrom<JsValue> for $t1 {
+                type Error = ValueError;
+
+                fn try_from(value: JsValue) -> Result<Self, Self::Error> {
+                    match value {
+                        JsValue::$var1(inner) => Ok(inner),
+                        _ => Err(ValueError::UnexpectedType)
+                    }
+
+                }
+            }
+        )*
+        $(
+            impl From<$t2> for JsValue {
+                fn from(value: $t2) -> Self {
+                    let $exprname = value;
+                    let inner = $expr;
+                    JsValue::$var2(inner)
+                }
+            }
+        )*
+    }
+}
+
+value_impl_from! {
+    (
+        bool => Bool,
+        i32 => Int,
+        f64 => Float,
+        String => String,
+    )
+    (
+        i8 => |x| x as i32 => Int,
+        i16 => |x| x as i32 => Int,
+        u8 => |x| x as i32 => Int,
+        u16 => |x| x as i32 => Int,
+        u32 => |x| x as f64 => Float,
+    )
+}
+
+impl<T> From<Vec<T>> for JsValue
+where
+    T: Into<JsValue>,
+{
+    fn from(values: Vec<T>) -> Self {
+        let items = values.into_iter().map(|x| x.into()).collect();
+        JsValue::Array(items)
+    }
+}
+
+impl<'a> From<&'a str> for JsValue {
+    fn from(val: &'a str) -> Self {
+        JsValue::String(val.into())
+    }
+}
+
+impl<T> From<Option<T>> for JsValue
+where
+    T: Into<JsValue>,
+{
+    fn from(opt: Option<T>) -> Self {
+        if let Some(value) = opt {
+            value.into()
+        } else {
+            JsValue::Null
+        }
+    }
+}
+
+impl<K, V> From<HashMap<K, V>> for JsValue
+where
+    K: Into<String>,
+    V: Into<JsValue>,
+{
+    fn from(map: HashMap<K, V>) -> Self {
+        let new_map = map.into_iter().map(|(k, v)| (k.into(), v.into())).collect();
+        JsValue::Object(new_map)
+    }
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub enum ValueError {
+    InvalidString(std::str::Utf8Error),
+    StringWithZeroBytes(std::ffi::NulError),
+    Internal(String),
+    UnexpectedType,
+}
+
+impl fmt::Display for ValueError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use ValueError::*;
+        match self {
+            InvalidString(e) => write!(
+                f,
+                "Value conversion failed - invalid non-utf8 string: {}",
+                e
+            ),
+            StringWithZeroBytes(_) => write!(f, "String contains \\0 bytes",),
+            Internal(e) => write!(f, "Value conversion failed - internal error: {}", e),
+            UnexpectedType => write!(f, "Could not convert - received unexpected type"),
+        }
+    }
+}
+
+impl error::Error for ValueError {}
