@@ -63,7 +63,29 @@ impl Context {
         })
     }
 
-    // Evaluates Javascript code and returns the value of the final expression.
+    /// Evaluates Javascript code and returns the value of the final expression.
+    ///
+    /// ```rust
+    /// use quickjs::{Context, JsValue};
+    /// let context = Context::new().unwrap();
+    /// 
+    /// let value = context.eval(" 1 + 2 + 3 ");
+    /// assert_eq!(
+    ///     value,
+    ///     Ok(JsValue::Int(6)),
+    /// );
+    /// 
+    /// let value = context.eval(r#"
+    ///     function f() { return 55 * 3; }
+    ///     let y = f();
+    ///     var x = y.toString() + "!"
+    ///     x
+    /// "#);
+    /// assert_eq!(
+    ///     value,
+    ///     Ok(JsValue::String("165!".to_string())),
+    /// );
+    /// ```
     pub fn eval(&self, code: &str) -> Result<JsValue, ExecutionError> {
         let value_raw = self.wrapper.eval(code)?;
         let value = value_raw.to_value()?;
@@ -72,6 +94,23 @@ impl Context {
 
     /// Evaluates Javascript code and returns the value of the final expression
     /// as a Rust type.
+    ///
+    /// ```rust
+    /// use quickjs::{Context};
+    /// let context = Context::new().unwrap();
+    /// 
+    /// let res = context.eval_as::<bool>(" 100 > 10 ");
+    /// assert_eq!(
+    ///     res,
+    ///     Ok(true),
+    /// );
+    /// 
+    /// let value: i32 = context.eval_as(" 10 + 10 ").unwrap();
+    /// assert_eq!(
+    ///     value,
+    ///     20,
+    /// );
+    /// ```
     pub fn eval_as<R>(&self, code: &str) -> Result<R, ExecutionError>
     where
         R: TryFrom<JsValue>,
@@ -84,6 +123,17 @@ impl Context {
     }
 
     /// Call a global function in the Javascript namespace.
+    ///
+    /// ```rust
+    /// use quickjs::{Context, JsValue};
+    /// let context = Context::new().unwrap();
+    /// 
+    /// let res = context.call_function("encodeURIComponent", vec!["a=b"]);
+    /// assert_eq!(
+    ///     res,
+    ///     Ok(JsValue::String("a%3Db".to_string())),
+    /// );
+    /// ```
     pub fn call_function(
         &self,
         function_name: &str,
@@ -109,6 +159,22 @@ impl Context {
     }
 
     /// Add a global JS function that is backed by a Rust function or closure.
+    /// 
+    /// ```rust
+    /// use quickjs::{Context, JsValue};
+    /// let context = Context::new().unwrap();
+    /// 
+    /// // Register a closue as a callback under the "add" name.
+    /// // The 'add' function can now be called from Javascript code.
+    /// context.add_callback("add", |a: i32, b: i32| { a + b }).unwrap();
+    /// 
+    /// // Now we try out the 'add' function via eval.
+    /// let output = context.eval_as::<i32>(" add( 3 , 4 ) ").unwrap();
+    /// assert_eq!(
+    ///     output,
+    ///     7,
+    /// );
+    /// ```
     pub fn add_callback<F>(
         &self,
         name: &str,
