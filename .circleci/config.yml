@@ -1,0 +1,28 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: debian:stable
+
+    steps:
+      - checkout
+
+      - run:
+          name: Ensure packages
+          command: apt-get update && apt-get install -y curl xz-utils build-essential gcc-multilib libclang-dev clang
+
+      - run:
+          name: Install rust
+          command: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+
+      - run: 
+          name: Install just
+          command: curl -LSfs https://japaric.github.io/trust/install.sh | sh -s -- --git casey/just --target x86_64-unknown-linux-musl --to /usr/local/bin
+
+      - run:
+          name: Install quickjs
+          command: just install
+
+      - run:
+          name: Run tests
+          command: $HOME/.cargo/bin/cargo test --verbose
