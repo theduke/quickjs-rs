@@ -11,4 +11,12 @@ authors = ["Christoph Herzog <chris@theduke.at>"]
 build = "build.rs"
 
 [build-dependencies]
-bindgen = "0.50.0"
+bindgen = { version = "0.50.0", optional = true }
+copy_dir = { version = "0.1.2", optional = true }
+
+
+[features]
+bundled = ["copy_dir"]
+default = ["bundled"]
+
+system = ["bindgen"]

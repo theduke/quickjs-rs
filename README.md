@@ -16,8 +16,13 @@ This crate allows you to easily run ES2019 based Javascript code from a Rust con
 
 ## Installation
 
+By default, quickjs is **bundled** with the `quickjs-sys` crate and automatically
+included. 
 
-To use this crate, `quickjs` must be installed on the system.
+### System installation
+
+To use the system installation, without the bundled feature, first install the required 
+dependencies, and then compile and install quickjs.
 
 ```bash
 # Debian/Ubuntu: apt-get install -y curl xz-utils build-essential gcc-multilib libclang-dev clang
