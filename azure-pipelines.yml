@@ -1,0 +1,41 @@
+trigger:
+  branches:
+    include:
+    - '*' 
+
+jobs:
+  - job: linux_stable
+    displayName: Linux Stable
+
+    pool:
+      vmImage: 'ubuntu-16.04'
+    steps:
+      - script: |
+          export PATH="$HOME/.cargo/bin:$HOME:$PATH"
+
+          echo "Installing Rust..."
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          echo "Installing just..."
+          curl -LSfs https://japaric.github.io/trust/install.sh | sh -s -- --git casey/just --target x86_64-unknown-linux-musl --to $HOME
+          hash -r
+          just ci-debian
+        displayName: setup and test
+      
+  - job: macos_stable
+    displayName: Mac OS Stable
+
+    pool:
+      vmImage: 'macOS-10.14'
+    steps:
+      - script: |
+        displayName: Setup and Test
+      - script: |
+          export PATH="$HOME/.cargo/bin:$HOME:$PATH"
+
+          echo "Installing Rust..."
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          echo "Installing just..."
+          curl -LSfs https://japaric.github.io/trust/install.sh | sh -s -- --git casey/just --to $HOME
+          hash -r
+          just ci-macos
+        displayName: setup and test
