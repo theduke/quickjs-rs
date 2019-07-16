@@ -4,14 +4,13 @@ A Rust wrapper for [quickjs](https://bellard.org/quickjs/), a Javascript engine.
 
 This crate allows you to easily run ES2019 based Javascript code from a Rust context.
 
-## Limitations
+## Limitations / Warnings
 
-There are some limitations due to the early state of `quickjs` and a incomplete 
-C API:
+There are some limitations due to the early state of `quickjs` and it's 
+somewhat unpolished/incomplete C API:
 
-* Parse errors/ Exceptions in Javascript code are currently only reported as a "Unknown Exception"
-* JS objects can not be deserialized into Rust (JsValue::Object) due to a missing API
-* Invoking callbacks from Javascript with an invalid number of arguments causes a SIGKILL.
+* Parse errors/exceptions while evaluating Javascript code are currently only reported as a "Unknown Exception"
+* JS objects can not be deserialized into Rust (JsValue::Object) due to a missing property enumeration API
 
 ## Installation
 
@@ -19,6 +18,7 @@ C API:
 To use this crate, `quickjs` must be installed on the system.
 
 ```bash
+# Debian/Ubuntu: apt install curl xz-utils build-essential gcc-multilib
 mkdir quickjs 
 curl -L https://bellard.org/quickjs/quickjs-2019-07-09.tar.xz | tar xJv -C quickjs --strip-components 1
 cd quickjs
@@ -39,7 +39,7 @@ let context = quickjs::Context::new().unwrap();
 let value = context.eval("1 + 2").unwrap();
 assert_eq!(value, JsValue::Int(3));
 
-let value: String = context.eval(" var x = 100 + 250; x.toString() ").unwrap();
+let value = context.eval_as::<String>(" var x = 100 + 250; x.toString() ").unwrap();
 assert_eq!(&value, "350");
 
 // Callbacks.
@@ -50,5 +50,4 @@ context.eval(r#"
     // x will equal 30
     var x = myCallback(10, 20);
 "#).unwrap();
-
 ```
