@@ -1,8 +1,12 @@
 [package]
-name = "quickjs-sys"
-version = "0.1.0"
-authors = ["Christoph Herzog <chris@theduke.at>"]
 edition = "2018"
+name = "quickjs-sys"
+version = "0.1.0-alpha.1"
+readme = "README.md"
+documentation = "https://docs.rs/quickjs-sys"
+repository = "https://github.com/theduke/quickjs-rs"
+license = "MIT"
+authors = ["Christoph Herzog <chris@theduke.at>"]
 
 build = "build.rs"
 

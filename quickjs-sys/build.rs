@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf};
+use std::{path::PathBuf};
 
 extern crate bindgen;
 
@@ -11,7 +11,7 @@ fn exists(path: &str) -> bool {
 fn find_lib() -> Option<String> {
     if cfg!(unix) {
         if exists("/usr/lib/quickjs/libquickjs.a") {
-            Some("/usr/lib/quickjs/libquickjs.a".into())
+            Some("/usr/lib/quickjs".into())
         } else if exists("/usr/local/lib/quickjs") {
             Some("/usr/local/lib/quickjs".into())
         } else {
