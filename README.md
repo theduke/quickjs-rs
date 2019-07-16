@@ -1,5 +1,9 @@
 # quickjs-rs
 
+[![Crates.io](https://img.shields.io/crates/v/quickjs.svg?maxAge=3600)](https://crates.io/crates/quickjs)
+[![docs.rs](https://docs.rs/quickjs/badge.svg)](https://docs.rs/crates/quickjs)
+[![CircleCI](https://circleci.com/gh/theduke/quickjs-rs.svg?style=svg)](https://circleci.com/gh/theduke/quickjs-rs)
+
 A Rust wrapper for [quickjs](https://bellard.org/quickjs/), a Javascript engine.
 
 This crate allows you to easily run ES2019 based Javascript code from a Rust context.
@@ -18,7 +22,7 @@ somewhat unpolished/incomplete C API:
 To use this crate, `quickjs` must be installed on the system.
 
 ```bash
-# Debian/Ubuntu: apt install curl xz-utils build-essential gcc-multilib
+# Debian/Ubuntu: apt-get install -y curl xz-utils build-essential gcc-multilib libclang-dev clang
 mkdir quickjs 
 curl -L https://bellard.org/quickjs/quickjs-2019-07-09.tar.xz | tar xJv -C quickjs --strip-components 1
 cd quickjs
