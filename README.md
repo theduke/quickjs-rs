@@ -12,12 +12,19 @@ It is fast and supports the full ES2019 specification (almost).
 
 This crate allows you to easily run and integrate with Javascript code from Rust.
 
-## Limitations / Warnings
+## WARNING
+
+QuickJS is in a very earyly state and contains bugs and memory safety issues.
+
+**Use at your own risk and not in production code.**
+
+This crate won't leave alpha-status until QuickJS is better tested and more
+stable.
+
+## Limitations
 
 * JS objects can not be deserialized into Rust (JsValue::Object) due to a missing property enumeration API
     (will be fixed soon)
-
-
 
 ## Usage
 
