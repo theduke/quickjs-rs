@@ -10,11 +10,8 @@ This crate allows you to easily run ES2019 based Javascript code from a Rust con
 
 ## Limitations / Warnings
 
-There are some limitations due to the early state of `quickjs` and it's 
-somewhat unpolished/incomplete C API:
-
-* Parse errors/exceptions while evaluating Javascript code are currently only reported as a "Unknown Exception"
 * JS objects can not be deserialized into Rust (JsValue::Object) due to a missing property enumeration API
+    (will be fixed soon)
 
 ## Installation
 

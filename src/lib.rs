@@ -70,13 +70,13 @@ impl Context {
     /// ```rust
     /// use quickjs::{Context, JsValue};
     /// let context = Context::new().unwrap();
-    /// 
+    ///
     /// let value = context.eval(" 1 + 2 + 3 ");
     /// assert_eq!(
     ///     value,
     ///     Ok(JsValue::Int(6)),
     /// );
-    /// 
+    ///
     /// let value = context.eval(r#"
     ///     function f() { return 55 * 3; }
     ///     let y = f();
@@ -100,13 +100,13 @@ impl Context {
     /// ```rust
     /// use quickjs::{Context};
     /// let context = Context::new().unwrap();
-    /// 
+    ///
     /// let res = context.eval_as::<bool>(" 100 > 10 ");
     /// assert_eq!(
     ///     res,
     ///     Ok(true),
     /// );
-    /// 
+    ///
     /// let value: i32 = context.eval_as(" 10 + 10 ").unwrap();
     /// assert_eq!(
     ///     value,
@@ -129,7 +129,7 @@ impl Context {
     /// ```rust
     /// use quickjs::{Context, JsValue};
     /// let context = Context::new().unwrap();
-    /// 
+    ///
     /// let res = context.call_function("encodeURIComponent", vec!["a=b"]);
     /// assert_eq!(
     ///     res,
@@ -161,15 +161,15 @@ impl Context {
     }
 
     /// Add a global JS function that is backed by a Rust function or closure.
-    /// 
+    ///
     /// ```rust
     /// use quickjs::{Context, JsValue};
     /// let context = Context::new().unwrap();
-    /// 
+    ///
     /// // Register a closue as a callback under the "add" name.
     /// // The 'add' function can now be called from Javascript code.
     /// context.add_callback("add", |a: i32, b: i32| { a + b }).unwrap();
-    /// 
+    ///
     /// // Now we try out the 'add' function via eval.
     /// let output = context.eval_as::<i32>(" add( 3 , 4 ) ").unwrap();
     /// assert_eq!(
@@ -249,7 +249,9 @@ mod tests {
                 !!!!
             "#
             ),
-            Err(ExecutionError::Internal("Unknown Exception".into(),))
+            Err(ExecutionError::Exception(
+                "SyntaxError: unexpected token in expression: \'\'".into()
+            ))
         );
     }
 
@@ -267,10 +269,7 @@ mod tests {
                 f();
             "#
             ),
-            // Err(ExecutionError::Exception(
-            //     "My Error".into(),
-            // ))
-            Err(ExecutionError::Internal("Unknown Exception".into(),))
+            Err(ExecutionError::Exception("Error: My Error".into(),))
         );
     }
 

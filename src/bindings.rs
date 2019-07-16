@@ -252,27 +252,27 @@ impl<'a> OwnedValueRef<'a> {
         self.value.tag == TAG_OBJECT
     }
 
-    // pub fn is_string(&self) -> bool {
-    //     self.value.tag == TAG_STRING
-    // }
+    pub fn is_string(&self) -> bool {
+        self.value.tag == TAG_STRING
+    }
 
-    // pub fn to_string(&self) -> Result<String, ExecutionError> {
-    //     let value = if self.is_string() {
-    //         self.to_value()?
-    //     } else {
-    //         let raw = unsafe { q::JS_ToString(self.context.context, self.value) };
-    //         let value = OwnedValueRef::new(self.context, raw);
+    pub fn to_string(&self) -> Result<String, ExecutionError> {
+        let value = if self.is_string() {
+            self.to_value()?
+        } else {
+            let raw = unsafe { q::JS_ToString(self.context.context, self.value) };
+            let value = OwnedValueRef::new(self.context, raw);
 
-    //         if value.value.tag != TAG_STRING {
-    //             return Err(ExecutionError::Exception(
-    //                 "Could not convert value to string".into(),
-    //             ));
-    //         }
-    //         value.to_value()?
-    //     };
+            if value.value.tag != TAG_STRING {
+                return Err(ExecutionError::Exception(
+                    "Could not convert value to string".into(),
+                ));
+            }
+            value.to_value()?
+        };
 
-    //     Ok(value.into_string().unwrap())
-    // }
+        Ok(value.into_string().unwrap())
+    }
 
     pub fn to_value(&self) -> Result<JsValue, ValueError> {
         self.context.to_value(&self.value)
@@ -625,10 +625,13 @@ impl ContextWrapper {
         let value = OwnedValueRef::new(self, value_raw);
 
         if value.is_exception() {
-            let exception = self
-                .get_exception()
-                .and_then(|e| e.to_value().map_err(ExecutionError::Conversion))
-                .map_err(|_| ExecutionError::Internal("Unknown Exception".to_string()))?;
+            let exception = self.get_exception().and_then(|e| match e.to_value() {
+                Ok(e) => Ok(e),
+                Err(_e) => e
+                    .to_string()
+                    .map(JsValue::String)
+                    .map_err(|_| ExecutionError::Internal("Unknown exception".into())),
+            })?;
             Err(ExecutionError::Exception(exception))
         } else {
             Ok(value)
