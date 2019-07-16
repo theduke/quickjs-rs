@@ -14,7 +14,7 @@ install: download
 
 ci-debian-setup:
     echo "Installing dependencies..."
-    sudo apt update && sudo apt-get install -y curl xz-utils build-essential gcc-multilib libclang-dev clang
+    apt update && apt-get install -y curl xz-utils build-essential gcc-multilib libclang-dev clang
 
 ci-test:
     cargo test --verbose

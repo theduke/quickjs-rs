@@ -3,6 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/quickjs.svg?maxAge=3600)](https://crates.io/crates/quickjs)
 [![docs.rs](https://docs.rs/quickjs/badge.svg)](https://docs.rs/crates/quickjs)
 [![Build Status](https://dev.azure.com/the-duke/quickjs-rs/_apis/build/status/theduke.quickjs-rs?branchName=master)](https://dev.azure.com/the-duke/quickjs-rs/_build/latest?definitionId=2&branchName=master)
+[![CircleCI](https://circleci.com/gh/theduke/quickjs-rs.svg?style=svg)](https://circleci.com/gh/theduke/quickjs-rs)
 
 
 A Rust wrapper for [quickjs](https://bellard.org/quickjs/), a Javascript engine.
