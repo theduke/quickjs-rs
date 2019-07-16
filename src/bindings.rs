@@ -252,27 +252,27 @@ impl<'a> OwnedValueRef<'a> {
         self.value.tag == TAG_OBJECT
     }
 
-    pub fn is_string(&self) -> bool {
-        self.value.tag == TAG_STRING
-    }
+    // pub fn is_string(&self) -> bool {
+    //     self.value.tag == TAG_STRING
+    // }
 
-    pub fn to_string(&self) -> Result<String, ExecutionError> {
-        let value = if self.is_string() {
-            self.to_value()?
-        } else {
-            let raw = unsafe { q::JS_ToString(self.context.context, self.value) };
-            let value = OwnedValueRef::new(self.context, raw);
+    // pub fn to_string(&self) -> Result<String, ExecutionError> {
+    //     let value = if self.is_string() {
+    //         self.to_value()?
+    //     } else {
+    //         let raw = unsafe { q::JS_ToString(self.context.context, self.value) };
+    //         let value = OwnedValueRef::new(self.context, raw);
 
-            if value.value.tag != TAG_STRING {
-                return Err(ExecutionError::Exception(
-                    "Could not convert value to string".into(),
-                ));
-            }
-            value.to_value()?
-        };
+    //         if value.value.tag != TAG_STRING {
+    //             return Err(ExecutionError::Exception(
+    //                 "Could not convert value to string".into(),
+    //             ));
+    //         }
+    //         value.to_value()?
+    //     };
 
-        Ok(value.into_string().unwrap())
-    }
+    //     Ok(value.into_string().unwrap())
+    // }
 
     pub fn to_value(&self) -> Result<JsValue, ValueError> {
         self.context.to_value(&self.value)
@@ -330,10 +330,10 @@ impl<'a> OwnedObjectRef<'a> {
         }
     }
 
-    pub fn set_property(&self, name: &str, value: JsValue) -> Result<(), ExecutionError> {
-        let qval = self.value.context.serialize_value(value)?;
-        unsafe { self.set_property_raw(name, qval.value) }
-    }
+    // pub fn set_property(&self, name: &str, value: JsValue) -> Result<(), ExecutionError> {
+    //     let qval = self.value.context.serialize_value(value)?;
+    //     unsafe { self.set_property_raw(name, qval.value) }
+    // }
 }
 
 /// Wraps a quickjs context.
@@ -698,7 +698,7 @@ impl ContextWrapper {
 
         match result {
             Ok(r) => r,
-            Err(e) => Err(ExecutionError::Internal(format!("Callback panicked!"))),
+            Err(_e) => Err(ExecutionError::Internal(format!("Callback panicked!"))),
         }
     }
 
