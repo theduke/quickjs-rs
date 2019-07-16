@@ -7,7 +7,7 @@ use std::{
     sync::Mutex,
 };
 
-use quickjs_sys as q;
+use libquickjs_sys as q;
 
 use crate::{ContextError, ExecutionError, JsValue, ValueError};
 

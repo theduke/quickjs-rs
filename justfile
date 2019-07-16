@@ -1,4 +1,4 @@
-embed_dir := "./quickjs-sys/embed/quickjs"
+embed_dir := "./libquickjs-sys/embed/quickjs"
 
 download:
     test -d {{embed_dir}} && rm -r {{embed_dir}} || echo ""

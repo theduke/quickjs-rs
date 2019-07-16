@@ -1,12 +1,15 @@
 [package]
 edition = "2018"
-name = "quickjs-sys"
+name = "libquickjs-sys"
+description = "QuickJS Javascript Engine FFI bindings"
 version = "0.1.0-alpha.1"
 readme = "README.md"
 documentation = "https://docs.rs/quickjs-sys"
 repository = "https://github.com/theduke/quickjs-rs"
 license = "MIT"
 authors = ["Christoph Herzog <chris@theduke.at>"]
+categories = ["external-ffi-bindings"]
+keywords = ["quickjs"]
 
 build = "build.rs"
 

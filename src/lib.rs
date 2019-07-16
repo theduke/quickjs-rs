@@ -68,7 +68,7 @@ impl Context {
     /// Evaluates Javascript code and returns the value of the final expression.
     ///
     /// ```rust
-    /// use quickjs::{Context, JsValue};
+    /// use quick::{Context, JsValue};
     /// let context = Context::new().unwrap();
     ///
     /// let value = context.eval(" 1 + 2 + 3 ");
@@ -98,7 +98,7 @@ impl Context {
     /// as a Rust type.
     ///
     /// ```rust
-    /// use quickjs::{Context};
+    /// use quick::{Context};
     /// let context = Context::new().unwrap();
     ///
     /// let res = context.eval_as::<bool>(" 100 > 10 ");
@@ -127,7 +127,7 @@ impl Context {
     /// Call a global function in the Javascript namespace.
     ///
     /// ```rust
-    /// use quickjs::{Context, JsValue};
+    /// use quick::{Context, JsValue};
     /// let context = Context::new().unwrap();
     ///
     /// let res = context.call_function("encodeURIComponent", vec!["a=b"]);
@@ -163,7 +163,7 @@ impl Context {
     /// Add a global JS function that is backed by a Rust function or closure.
     ///
     /// ```rust
-    /// use quickjs::{Context, JsValue};
+    /// use quick::{Context, JsValue};
     /// let context = Context::new().unwrap();
     ///
     /// // Register a closue as a callback under the "add" name.
@@ -238,8 +238,6 @@ mod tests {
         assert_eq!(&value, "44");
     }
 
-    // TODO: test for a better error once quickjs reports parse errors.
-    // quickjs swallows the error in this case, sadly.
     #[test]
     fn test_eval_syntax_error() {
         let c = Context::new().unwrap();
@@ -255,8 +253,6 @@ mod tests {
         );
     }
 
-    // TODO: make this pass with the correct error.
-    // quickjs swallows the error in this case, sadly.
     #[test]
     fn test_eval_exception() {
         let c = Context::new().unwrap();

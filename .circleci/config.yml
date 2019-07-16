@@ -6,7 +6,7 @@ jobs:
     steps:
       - checkout
       - run:
-          name: The First Step
+          name: Setup, Build & Test
           command: |
             export PATH="$HOME/.cargo/bin:$HOME:$PATH"
 

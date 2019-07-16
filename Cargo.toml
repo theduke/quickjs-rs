@@ -1,17 +1,19 @@
 [package]
 edition = "2018"
-name = "quickjs"
-version = "0.1.0-alpha.1"
+name = "quick"
+description = "QuickJS Javascript engine wrapper"
+version = "0.1.0-alpha.2"
 readme = "README.md"
 documentation = "https://docs.rs/quickjs"
 repository = "https://github.com/theduke/quickjs-rs"
 license = "MIT"
 authors = ["Christoph Herzog <chris@theduke.at>"]
+keywords = ["quickjs", "javascript", "js", "engine", "interpreter"]
 
 [dependencies]
-quickjs-sys = { version = "0.1.0-alpha.1", path = "./quickjs-sys" }
+libquickjs-sys = { version = "0.1.0-alpha.1", path = "./libquickjs-sys" }
 
 [workspace]
 members = [
-    "quickjs-sys",
+    "libquickjs-sys",
 ]

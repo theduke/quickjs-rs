@@ -8,7 +8,7 @@ fn exists(path: impl AsRef<Path>) -> bool {
 
 #[cfg(all(not(feature = "system"), not(feature = "bundled")))]
 fn main() {
-    panic!("Invalid config for crate quickjs-sys: must enable either the 'bundled' or the 'system' feature");
+    panic!("Invalid config for crate libquickjs-sys: must enable either the 'bundled' or the 'system' feature");
 }
 
 #[cfg(feature = "system")]
@@ -17,7 +17,7 @@ extern crate bindgen;
 #[cfg(feature = "system")]
 fn main() {
     #[cfg(not(feature = "bindgen"))]
-    panic!("Invalid configuration for quickjs-sys: Must either enable the bundled or the bindgen feature");
+    panic!("Invalid configuration for libquickjs-sys: Must either enable the bundled or the bindgen feature");
 
 
     let lib = if cfg!(unix) {
