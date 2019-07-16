@@ -141,7 +141,7 @@ mod tests {
     // }
 
     #[test]
-    fn test_eval() {
+    fn test_eval_pass() {
         let c = Context::new().unwrap();
 
         let cases = vec![
@@ -168,6 +168,42 @@ mod tests {
 
         let value: String = c.eval_as("var x = 44; x.toString()").unwrap();
         assert_eq!(&value, "44");
+    }
+
+    // TODO: test for a better error once quickjs reports parse errors.
+    // quickjs swallows the error in this case, sadly.
+    #[test]
+    fn test_eval_syntax_error() {
+        let c = Context::new().unwrap();
+        assert_eq!(
+            c.eval(
+                r#"
+                !!!!
+            "#
+            ),
+            Err(ExecutionError::Internal("Unknown Exception".into(),))
+        );
+    }
+
+    // TODO: make this pass with the correct error.
+    // quickjs swallows the error in this case, sadly.
+    #[test]
+    fn test_eval_exception() {
+        let c = Context::new().unwrap();
+        assert_eq!(
+            c.eval(
+                r#"
+                function f() {
+                    throw new Error("My Error");
+                }
+                f();
+            "#
+            ),
+            // Err(ExecutionError::Exception(
+            //     "My Error".into(),
+            // ))
+            Err(ExecutionError::Internal("Unknown Exception".into(),))
+        );
     }
 
     #[test]
@@ -254,7 +290,7 @@ mod tests {
     fn test_callback_invalid_argcount() {
         let c = Context::new().unwrap();
 
-        c.add_callback("cb", |a: i32, b: i32| a + b).unwrap(); 
+        c.add_callback("cb", |a: i32, b: i32| a + b).unwrap();
 
         assert_eq!(
             c.eval(" cb(5) "),
@@ -263,4 +299,5 @@ mod tests {
             )),
         );
     }
+
 }

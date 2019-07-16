@@ -1,10 +1,10 @@
 use std::{
-    sync::Mutex,
     convert::TryFrom,
     ffi::CString,
     marker::PhantomData,
     os::raw::{c_int, c_void},
     panic::RefUnwindSafe,
+    sync::Mutex,
 };
 
 use quickjs_sys as q;
@@ -63,7 +63,10 @@ where
 
     fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
         if args.len() != 0 {
-            return Ok(Err(format!("Invalid argument count: Expected 0, got {}", args.len())));
+            return Ok(Err(format!(
+                "Invalid argument count: Expected 0, got {}",
+                args.len()
+            )));
         }
 
         let res = self().into();
@@ -83,7 +86,10 @@ where
     }
     fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
         if args.len() != 1 {
-            return Ok(Err(format!("Invalid argument count: Expected 1, got {}", args.len())));
+            return Ok(Err(format!(
+                "Invalid argument count: Expected 1, got {}",
+                args.len()
+            )));
         }
 
         let arg_raw = args.into_iter().next().expect("Invalid argument count");
@@ -107,7 +113,10 @@ where
 
     fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
         if args.len() != 2 {
-            return Ok(Err(format!("Invalid argument count: Expected 2, got {}", args.len())));
+            return Ok(Err(format!(
+                "Invalid argument count: Expected 2, got {}",
+                args.len()
+            )));
         }
 
         let mut iter = args.into_iter();
@@ -137,7 +146,10 @@ where
 
     fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
         if args.len() != 3 {
-            return Ok(Err(format!("Invalid argument count: Expected 3, got {}", args.len())));
+            return Ok(Err(format!(
+                "Invalid argument count: Expected 3, got {}",
+                args.len()
+            )));
         }
 
         let mut iter = args.into_iter();
@@ -665,7 +677,6 @@ impl ContextWrapper {
         argv: *mut q::JSValue,
         callback: &impl Callback<F>,
     ) -> Result<OwnedValueRef<'a>, ExecutionError> {
-
         let result = std::panic::catch_unwind(|| {
             let arg_slice = unsafe { std::slice::from_raw_parts(argv, argc as usize) };
 
@@ -687,9 +698,7 @@ impl ContextWrapper {
 
         match result {
             Ok(r) => r,
-            Err(e) => {
-                Err(ExecutionError::Internal(format!("Callback panicked!")))
-            }
+            Err(e) => Err(ExecutionError::Internal(format!("Callback panicked!"))),
         }
     }
 
@@ -710,9 +719,7 @@ impl ContextWrapper {
                 Ok(value) => unsafe { value.into_inner() },
                 // TODO: better error reporting.
                 Err(e) => {
-                    let js_exception = ctx
-                        .serialize_value(e.to_string().into())
-                        .unwrap();
+                    let js_exception = ctx.serialize_value(e.to_string().into()).unwrap();
                     unsafe {
                         q::JS_Throw(ctx.context, js_exception.into_inner());
                     }
