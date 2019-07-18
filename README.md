@@ -8,13 +8,13 @@
 A Rust wrapper for [QuickJS](https://bellard.org/quickjs/). 
 
 QuickJS is a new, small Javascript engine by Fabrice Bellard. 
-It is fast and supports the full ES2019 specification (almost).
+It is fast and supports the full ES2019 specification.
 
 This crate allows you to easily run and integrate with Javascript code from Rust.
 
 ## WARNING
 
-QuickJS is in a very earyly state and contains bugs and memory safety issues.
+QuickJS is in a very earyly state and contains bugs and **memory safety** issues.
 
 **Use at your own risk and not in production code.**
 
@@ -61,9 +61,9 @@ context.eval(r#"
 By default, quickjs is **bundled** with the `libquickjs-sys` crate and
 automatically compiled, assuming you have the appropriate dependencies.
 
-QuickJS will always be statically linked to your binary.
+If you would like to use a system version instead, see below. 
 
-If you would like to use a system version instead, see below.
+QuickJS will always be statically linked to your binary.
 
 ### System installation
 
@@ -79,11 +79,3 @@ sudo make install
 ```
 
 Then just add `quickjs` as a dependency.
-
-## Crate Naming
-
-The obvious and preferred choices for the crate names would have been 
-`quickjs-sys` and `quickjs`.
-
-Sadly, those crates were name-squatted without published code. 
-Hence the less optimal names.
