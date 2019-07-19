@@ -36,7 +36,7 @@ quick = "0.1.0-alpha.2"
 ```rust
 use quick::{Context, JsValue};
 
-let context = quickjs::Context::new().unwrap();
+let context = Context::new().unwrap();
 
 // Eval.
 
