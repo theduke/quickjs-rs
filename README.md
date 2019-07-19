@@ -34,7 +34,7 @@ quick = "0.1.0-alpha.2"
 ```
 
 ```rust
-use quickjs::{Context, JsValue};
+use quick::{Context, JsValue};
 
 let context = quickjs::Context::new().unwrap();
 
@@ -78,4 +78,3 @@ cd quickjs
 sudo make install
 ```
 
-Then just add `quickjs` as a dependency.
