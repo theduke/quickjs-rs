@@ -1,7 +1,7 @@
 # quickjs-rs
 
-[![Crates.io](https://img.shields.io/crates/v/quick.svg?maxAge=3600)](https://crates.io/crates/quick)
-[![docs.rs](https://docs.rs/quick/badge.svg)](https://docs.rs/crates/quick)
+[![Crates.io](https://img.shields.io/crates/v/quick-js.svg?maxAge=3600)](https://crates.io/crates/quick)
+[![docs.rs](https://docs.rs/quick/badge.svg)](https://docs.rs/crates/quick-js)
 [![Build Status](https://dev.azure.com/the-duke/quickjs-rs/_apis/build/status/theduke.quickjs-rs?branchName=master)](https://dev.azure.com/the-duke/quickjs-rs/_build/latest?definitionId=2&branchName=master)
 [![CircleCI](https://circleci.com/gh/theduke/quickjs-rs.svg?style=svg)](https://circleci.com/gh/theduke/quickjs-rs)
 
@@ -12,29 +12,21 @@ It is fast and supports the full ES2019 specification.
 
 This crate allows you to easily run and integrate with Javascript code from Rust.
 
-## WARNING
-
-QuickJS is in a very earyly state and contains bugs and **memory safety** issues.
-
-**Use at your own risk and not in production code.**
-
-This crate won't leave alpha-status until QuickJS is better tested and more
-stable.
-
 ## Limitations
 
 * JS objects can not be deserialized into Rust (JsValue::Object) due to a missing property enumeration API
     (will be fixed soon)
+* Windows is not supported yet
 
 ## Usage
 
 ```toml
 [dependencies]
-quick = "0.1.0-alpha.4"
+quick-js = "0.1.0"
 ```
 
 ```rust
-use quick::{Context, JsValue};
+use quick_js::{Context, JsValue};
 
 let context = Context::new().unwrap();
 
