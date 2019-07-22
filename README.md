@@ -30,7 +30,7 @@ stable.
 
 ```toml
 [dependencies]
-quick = "0.1.0-alpha.2"
+quick = "0.1.0-alpha.4"
 ```
 
 ```rust
