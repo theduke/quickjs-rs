@@ -1,3 +1,39 @@
+//! quick-js is a a Rust wrapper for [QuickJS](https://bellard.org/quickjs/), a new Javascript
+//! engine by Fabrice Bellard.
+//!
+//! It enables easy and straight-forward execution of modern Javascript from Rust.
+//!
+//! ## Limitations
+//!
+//!* JS objects can not be deserialized into Rust (JsValue::Object) due to a missing property enumeration API
+//!    (will be fixed soon)
+//! * Windows is not supported yet
+//!
+//! ## Quickstart:
+//!
+//! ```rust
+//! use quick_js::{Context, JsValue};
+//! 
+//! let context = Context::new().unwrap();
+//! 
+//! // Eval.
+//! 
+//! let value = context.eval("1 + 2").unwrap();
+//! assert_eq!(value, JsValue::Int(3));
+//! 
+//! let value = context.eval_as::<String>(" var x = 100 + 250; x.toString() ").unwrap();
+//! assert_eq!(&value, "350");
+//! 
+//! // Callbacks.
+//! 
+//! context.add_callback("myCallback", |a: i32, b: i32| a + b).unwrap();
+//! 
+//! context.eval(r#"
+//!     // x will equal 30
+//!     var x = myCallback(10, 20);
+//! "#).unwrap();
+//! ```
+
 #![deny(warnings)]
 
 mod bindings;
@@ -8,6 +44,7 @@ use std::{convert::TryFrom, error, fmt};
 pub use bindings::Callback;
 pub use value::*;
 
+/// Error on Javascript execution.
 #[derive(PartialEq, Debug)]
 pub enum ExecutionError {
     InputWithZeroBytes,
@@ -36,6 +73,7 @@ impl From<ValueError> for ExecutionError {
     }
 }
 
+/// Error on context creation.
 #[derive(Debug)]
 pub enum ContextError {
     RuntimeCreationFailed,
@@ -54,11 +92,14 @@ impl fmt::Display for ContextError {
 
 impl error::Error for ContextError {}
 
+/// Context is a wrapper around a QuickJS Javascript context.
+/// It is the primary way to interact with the runtime.
 pub struct Context {
     wrapper: bindings::ContextWrapper,
 }
 
 impl Context {
+    /// Create a new Javascript context.
     pub fn new() -> Result<Self, ContextError> {
         Ok(Self {
             wrapper: bindings::ContextWrapper::new()?,
