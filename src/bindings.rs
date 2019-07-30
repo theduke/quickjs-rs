@@ -47,7 +47,15 @@ fn make_cstring(value: impl Into<Vec<u8>>) -> Result<CString, ValueError> {
 /// The Callback trait is implemented for functions/closures that can be
 /// used as callbacks in the JS runtime.
 pub trait Callback<F>: RefUnwindSafe {
+    /// The number of JS arguments required.
     fn argument_count(&self) -> usize;
+    /// Execute the callback.
+    /// 
+    /// Should return:
+    ///   - Err(_) if the JS values could not be converted
+    ///   - Ok(Err(_)) if an error ocurred while processing. 
+    ///       The given error will be raised as a JS exception.
+    ///   - Ok(Ok(result)) when execution succeeded.
     fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError>;
 }
 
@@ -275,7 +283,7 @@ impl<'a> OwnedValueRef<'a> {
             value.to_value()?
         };
 
-        Ok(value.into_string().unwrap())
+        Ok(value.as_str().unwrap().to_string())
     }
 
     pub fn to_value(&self) -> Result<JsValue, ValueError> {

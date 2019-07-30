@@ -35,6 +35,7 @@
 //! ```
 
 #![deny(warnings)]
+#![deny(missing_docs)]
 
 mod bindings;
 mod value;
@@ -47,10 +48,15 @@ pub use value::*;
 /// Error on Javascript execution.
 #[derive(PartialEq, Debug)]
 pub enum ExecutionError {
+    /// Code to be executed contained zero-bytes.
     InputWithZeroBytes,
+    /// Value conversion failed. (either input arguments or result value).
     Conversion(ValueError),
+    /// Internal error.
     Internal(String),
+    /// JS Exception was thrown.
     Exception(JsValue),
+    /// JS Runtime exceeded the memory limit.
     OutOfMemory,
     #[doc(hidden)]
     __NonExhaustive,
@@ -81,7 +87,9 @@ impl From<ValueError> for ExecutionError {
 /// Error on context creation.
 #[derive(Debug)]
 pub enum ContextError {
+    /// Runtime could not be created.
     RuntimeCreationFailed,
+    /// Context could not be created.
     ContextCreationFailed,
     #[doc(hidden)]
     __NonExhaustive,
@@ -100,6 +108,9 @@ impl fmt::Display for ContextError {
 
 impl error::Error for ContextError {}
 
+/// A builder for [Context](Context).
+///
+/// Create with [Context::builder](Context::builder).
 pub struct ContextBuilder {
     memory_limit: Option<usize>,
 }
@@ -120,6 +131,7 @@ impl ContextBuilder {
         s
     }
 
+    /// Finalize the builder and build a JS Context.
     pub fn build(self) -> Result<Context, ContextError> {
         let wrapper = bindings::ContextWrapper::new(self.memory_limit)?;
         Ok(Context::from_wrapper(wrapper))

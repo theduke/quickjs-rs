@@ -2,6 +2,7 @@ use std::{collections::HashMap, error, fmt};
 
 /// A value that can be (de)serialized to/from the quickjs runtime.
 #[derive(PartialEq, Clone, Debug)]
+#[allow(missing_docs)]
 pub enum JsValue {
     Null,
     Bool(bool),
@@ -13,9 +14,12 @@ pub enum JsValue {
 }
 
 impl JsValue {
-    pub fn into_string(self) -> Option<String> {
+    /// Cast value to a str.
+    ///
+    /// Returns `Some(&str)` if value is a `JsValue::String`, None otherwise.
+    pub fn as_str(&self) -> Option<&str> {
         match self {
-            JsValue::String(s) => Some(s),
+            JsValue::String(ref s) => Some(s.as_str()),
             _ => None,
         }
     }
@@ -117,11 +121,16 @@ where
     }
 }
 
+/// Error during value conversion.
 #[derive(PartialEq, Eq, Debug)]
 pub enum ValueError {
+    /// Invalid non-utf8 string.
     InvalidString(std::str::Utf8Error),
+    /// Encountered string with \0 bytes.
     StringWithZeroBytes(std::ffi::NulError),
+    /// Internal error.
     Internal(String),
+    /// Received an unexpected type that could not be converted.
     UnexpectedType,
     #[doc(hidden)]
     __NonExhaustive,
