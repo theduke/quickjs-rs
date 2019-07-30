@@ -372,6 +372,16 @@ mod tests {
     }
 
     #[test]
+    fn test_call_large_string() {
+        let c = Context::new().unwrap();
+        c.eval(" function strLen(s) { return s.length; } ").unwrap();
+
+        let s = " ".repeat(200_000);
+        let v = c.call_function("strLen", vec![s]).unwrap();
+        assert_eq!(v, JsValue::Int(200_000));
+    }
+
+    #[test]
     fn test_callback() {
         let c = Context::new().unwrap();
 
@@ -403,5 +413,7 @@ mod tests {
             )),
         );
     }
+
+
 
 }
