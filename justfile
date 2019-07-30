@@ -24,7 +24,8 @@ ci-debian-setup:
     apt update && apt-get install -y curl xz-utils build-essential gcc-multilib libclang-dev clang
 
 ci-test:
-    cargo test --verbose
+    # Limit test threads to 1 to show test name before execution.
+    RUST_TEST_THREADS=1 cargo test --verbose
 
 ci-debian: ci-debian-setup ci-test
 
