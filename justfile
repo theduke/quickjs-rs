@@ -27,7 +27,16 @@ ci-test:
     # Limit test threads to 1 to show test name before execution.
     RUST_TEST_THREADS=1 cargo test --verbose
 
-ci-debian: ci-debian-setup ci-test
+ci-lint:
+    rustup component add rustfmt clippy
+    echo "Linting!"
+
+    echo "Checking formatting..."
+    cargo fmt -- --check
+    echo "Checking clippy..."
+    cargo clippy
+
+ci-debian: ci-debian-setup ci-test ci-lint
 
 ci-macos-setup:
     echo "setup"
