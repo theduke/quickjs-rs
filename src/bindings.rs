@@ -1,15 +1,12 @@
 use std::{
-    convert::TryFrom,
     ffi::CString,
-    marker::PhantomData,
     os::raw::{c_int, c_void},
-    panic::RefUnwindSafe,
     sync::Mutex,
 };
 
 use libquickjs_sys as q;
 
-use crate::{ContextError, ExecutionError, JsValue, ValueError};
+use crate::{callback::Callback, ContextError, ExecutionError, JsValue, ValueError};
 
 // JS_TAG_* constants from quickjs.
 // For some reason bindgen does not pick them up.
@@ -42,137 +39,6 @@ unsafe fn free_value(context: *mut q::JSContext, value: q::JSValue) {
 /// Helper for creating CStrings.
 fn make_cstring(value: impl Into<Vec<u8>>) -> Result<CString, ValueError> {
     CString::new(value).map_err(ValueError::StringWithZeroBytes)
-}
-
-/// The Callback trait is implemented for functions/closures that can be
-/// used as callbacks in the JS runtime.
-pub trait Callback<F>: RefUnwindSafe {
-    /// The number of JS arguments required.
-    fn argument_count(&self) -> usize;
-    /// Execute the callback.
-    /// 
-    /// Should return:
-    ///   - Err(_) if the JS values could not be converted
-    ///   - Ok(Err(_)) if an error ocurred while processing. 
-    ///       The given error will be raised as a JS exception.
-    ///   - Ok(Ok(result)) when execution succeeded.
-    fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError>;
-}
-
-// Implement Callback for Fn(A) -> R functions.
-impl<R, F> Callback<PhantomData<(&R, &F)>> for F
-where
-    R: Into<JsValue>,
-    F: Fn() -> R + Sized + RefUnwindSafe,
-{
-    fn argument_count(&self) -> usize {
-        0
-    }
-
-    fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
-        if !args.is_empty() {
-            return Ok(Err(format!(
-                "Invalid argument count: Expected 0, got {}",
-                args.len()
-            )));
-        }
-
-        let res = self().into();
-        Ok(Ok(res))
-    }
-}
-
-// Implement Callback for Fn(A) -> R functions.
-impl<A1, R, F> Callback<PhantomData<(&A1, &R, &F)>> for F
-where
-    A1: TryFrom<JsValue, Error = ValueError>,
-    R: Into<JsValue>,
-    F: Fn(A1) -> R + Sized + RefUnwindSafe,
-{
-    fn argument_count(&self) -> usize {
-        1
-    }
-    fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
-        if args.len() != 1 {
-            return Ok(Err(format!(
-                "Invalid argument count: Expected 1, got {}",
-                args.len()
-            )));
-        }
-
-        let arg_raw = args.into_iter().next().expect("Invalid argument count");
-        let arg = A1::try_from(arg_raw)?;
-        let res = self(arg).into();
-        Ok(Ok(res))
-    }
-}
-
-// Implement Callback for Fn(A1, A2) -> R functions.
-impl<A1, A2, R, F> Callback<PhantomData<(&A1, &A2, &R, &F)>> for F
-where
-    A1: TryFrom<JsValue, Error = ValueError>,
-    A2: TryFrom<JsValue, Error = ValueError>,
-    R: Into<JsValue>,
-    F: Fn(A1, A2) -> R + Sized + RefUnwindSafe,
-{
-    fn argument_count(&self) -> usize {
-        1
-    }
-
-    fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
-        if args.len() != 2 {
-            return Ok(Err(format!(
-                "Invalid argument count: Expected 2, got {}",
-                args.len()
-            )));
-        }
-
-        let mut iter = args.into_iter();
-        let arg1_raw = iter.next().expect("Invalid argument count");
-        let arg1 = A1::try_from(arg1_raw)?;
-
-        let arg2_raw = iter.next().expect("Invalid argument count");
-        let arg2 = A2::try_from(arg2_raw)?;
-
-        let res = self(arg1, arg2).into();
-        Ok(Ok(res))
-    }
-}
-
-// Implement Callback for Fn(A1, A2, A3) -> R functions.
-impl<A1, A2, A3, R, F> Callback<PhantomData<(&A1, &A2, &A3, &R, &F)>> for F
-where
-    A1: TryFrom<JsValue, Error = ValueError>,
-    A2: TryFrom<JsValue, Error = ValueError>,
-    A3: TryFrom<JsValue, Error = ValueError>,
-    R: Into<JsValue>,
-    F: Fn(A1, A2, A3) -> R + Sized + RefUnwindSafe,
-{
-    fn argument_count(&self) -> usize {
-        1
-    }
-
-    fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
-        if args.len() != 3 {
-            return Ok(Err(format!(
-                "Invalid argument count: Expected 3, got {}",
-                args.len()
-            )));
-        }
-
-        let mut iter = args.into_iter();
-        let arg1_raw = iter.next().expect("Invalid argument count");
-        let arg1 = A1::try_from(arg1_raw)?;
-
-        let arg2_raw = iter.next().expect("Invalid argument count");
-        let arg2 = A2::try_from(arg2_raw)?;
-
-        let arg3_raw = iter.next().expect("Invalid argument count");
-        let arg3 = A3::try_from(arg3_raw)?;
-
-        let res = self(arg1, arg2, arg3).into();
-        Ok(Ok(res))
-    }
 }
 
 type WrappedCallback = dyn Fn(c_int, *mut q::JSValue) -> q::JSValue;
@@ -745,7 +611,7 @@ impl ContextWrapper {
                     Ok(serialized)
                 }
                 // TODO: better error reporting.
-                Ok(Err(e)) => Err(ExecutionError::Internal(e.to_string())),
+                Ok(Err(e)) => Err(ExecutionError::Exception(JsValue::String(e))),
                 Err(e) => Err(e.into()),
             }
         });
@@ -773,7 +639,11 @@ impl ContextWrapper {
                 Ok(value) => unsafe { value.into_inner() },
                 // TODO: better error reporting.
                 Err(e) => {
-                    let js_exception = ctx.serialize_value(e.to_string().into()).unwrap();
+                    let js_exception_value = match e {
+                        ExecutionError::Exception(e) => e,
+                        other => other.to_string().into(),
+                    };
+                    let js_exception = ctx.serialize_value(js_exception_value).unwrap();
                     unsafe {
                         q::JS_Throw(ctx.context, js_exception.into_inner());
                     }
