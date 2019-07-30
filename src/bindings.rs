@@ -30,7 +30,7 @@ unsafe fn free_value(context: *mut q::JSContext, value: q::JSValue) {
     if value.tag < 0 {
         // This transmute is OK since if tag < 0, the union will be a refcount
         // pointer.
-        let ptr = std::mem::transmute::<_, *mut q::JSRefCountHeader>(value.u.ptr);
+        let ptr = value.u.ptr as *mut q::JSRefCountHeader;
         let pref: &mut q::JSRefCountHeader = &mut *ptr;
         pref.ref_count -= 1;
         if pref.ref_count <= 0 {
@@ -62,7 +62,7 @@ where
     }
 
     fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
-        if args.len() != 0 {
+        if !args.is_empty() {
             return Ok(Err(format!(
                 "Invalid argument count: Expected 0, got {}",
                 args.len()
@@ -406,7 +406,7 @@ impl ContextWrapper {
     }
 
     /// Serialize a Rust value into a quickjs runtime value.
-    pub fn serialize_value<'a>(&'a self, value: JsValue) -> Result<OwnedValueRef<'a>, ValueError> {
+    pub fn serialize_value(&self, value: JsValue) -> Result<OwnedValueRef<'_>, ValueError> {
         let context = self.context;
         let v = match value {
             JsValue::Null => q::JSValue {
@@ -557,7 +557,7 @@ impl ContextWrapper {
                     q::JS_ToCStringLen(context, std::ptr::null::<i32>() as *mut i32, *r, 0)
                 };
 
-                if ptr == std::ptr::null() {
+                if ptr.is_null() {
                     return Err(ValueError::Internal(
                         "Could not convert string: got a null pointer".into(),
                     ));
@@ -567,7 +567,7 @@ impl ContextWrapper {
 
                 let s = cstr
                     .to_str()
-                    .map_err(|e| ValueError::InvalidString(e))?
+                    .map_err(ValueError::InvalidString)?
                     .to_string();
 
                 // Free the c string.
@@ -584,8 +584,7 @@ impl ContextWrapper {
                     let len_value = unsafe {
                         let raw = q::JS_GetPropertyStr(context, *r, length_name.as_ptr());
                         let wrapped = OwnedValueRef::new(self, raw);
-                        let len = wrapped.to_value()?;
-                        len
+                        wrapped.to_value()?
                     };
                     let len = if let JsValue::Int(x) = len_value {
                         x
@@ -620,7 +619,7 @@ impl ContextWrapper {
     }
 
     /// Get the global object.
-    pub fn global<'a>(&'a self) -> Result<OwnedObjectRef<'a>, ExecutionError> {
+    pub fn global(&self) -> Result<OwnedObjectRef<'_>, ExecutionError> {
         let global_raw = unsafe { q::JS_GetGlobalObject(self.context) };
         let global_ref = OwnedValueRef::new(self, global_raw);
         let global = OwnedObjectRef::new(global_ref)?;
@@ -628,7 +627,7 @@ impl ContextWrapper {
     }
 
     /// Get the last exception from the runtime, and if present, convert it to a ExceptionError.
-    fn get_exception<'a>(&'a self) -> Option<ExecutionError> {
+    fn get_exception(&self) -> Option<ExecutionError> {
         let raw = unsafe { q::JS_GetException(self.context) };
         let value = OwnedValueRef::new(self, raw);
 
@@ -663,14 +662,13 @@ impl ContextWrapper {
         let code_c = make_cstring(code)?;
 
         let value_raw = unsafe {
-            let v = q::JS_Eval(
+            q::JS_Eval(
                 self.context,
                 code_c.as_ptr(),
                 code.len(),
                 filename_c.as_ptr(),
                 q::JS_EVAL_TYPE_GLOBAL as i32,
-            );
-            v
+            )
         };
         let value = OwnedValueRef::new(self, value_raw);
 
@@ -746,7 +744,7 @@ impl ContextWrapper {
 
         match result {
             Ok(r) => r,
-            Err(_e) => Err(ExecutionError::Internal(format!("Callback panicked!"))),
+            Err(_e) => Err(ExecutionError::Internal("Callback panicked!".to_string())),
         }
     }
 

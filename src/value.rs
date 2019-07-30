@@ -69,11 +69,11 @@ value_impl_from! {
         String => String,
     )
     (
-        i8 => |x| x as i32 => Int,
-        i16 => |x| x as i32 => Int,
-        u8 => |x| x as i32 => Int,
-        u16 => |x| x as i32 => Int,
-        u32 => |x| x as f64 => Float,
+        i8 => |x| i32::from(x) => Int,
+        i16 => |x| i32::from(x) => Int,
+        u8 => |x| i32::from(x) => Int,
+        u16 => |x| i32::from(x) => Int,
+        u32 => |x| f64::from(x) => Float,
     )
 }
 
