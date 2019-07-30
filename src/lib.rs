@@ -576,4 +576,26 @@ mod tests {
         let err_msg = c2.eval(" myCallback() ").unwrap_err().to_string();
         assert!(err_msg.contains("ReferenceError"));
     }
+
+    #[inline(never)]
+    fn build_context() -> Context {
+        let ctx = Context::new().unwrap();
+        let name = "cb".to_string();
+        ctx.add_callback(&name, |a: String| a.repeat(2)).unwrap();
+
+        let code = " function f(value) { return cb(value); } ".to_string();
+        ctx.eval(&code).unwrap();
+
+        ctx
+    }
+
+    #[test]
+    fn moved_context() {
+        let c = build_context();
+        let v = c.call_function("f", vec!["test"]).unwrap();
+        assert_eq!(v, "testtest".into());
+
+        let v = c.eval(" f('la') ").unwrap();
+        assert_eq!(v, "lala".into());
+    }
 }
