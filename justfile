@@ -1,16 +1,23 @@
 embed_dir := "./libquickjs-sys/embed/quickjs"
 
-download:
+DOWNLOAD_URL := "https://bellard.org/quickjs/quickjs-2019-07-28.tar.xz"
+
+download-new:
     test -d {{embed_dir}} && rm -r {{embed_dir}} || echo ""
     mkdir {{embed_dir}} && \
-    curl -L https://bellard.org/quickjs/quickjs-2019-07-21.tar.xz | tar xJv -C {{embed_dir}} --strip-components 1
-    find {{embed_dir}} | grep ""
+    curl -L {{DOWNLOAD_URL}} | tar xJv -C {{embed_dir}} --strip-components 1
 
-    find {{embed_dir}} | grep -E "pdf|html|texi" | xargs rm
-    rm -r {{embed_dir}}/doc
+download-cleanup:
+    rm -r "{{embed_dir}}/doc" "{{embed_dir}}/examples" "{{embed_dir}}/tests"
+    find "{{embed_dir}}" -type f | grep -E "\.(pdf|html|js|texi|sh)$" | xargs rm
+    find "{{embed_dir}}" -type f | grep test | xargs rm
 
-install: download
-    cd {{embed_dir}} && sudo make install
+generate-bindings:
+    (cd libquickjs-sys; bindgen wrapper.h -o embed/bindings.rs -- -I ./embed)
+    # Update VERSION in README
+    sed -i "s/**Embedded VERSION: .*/**Embedded VERSION: $(cat ./libquickjs-sys/embed/quickjs/VERSION)**/" ./libquickjs-sys/README.md
+
+update-quickjs: download-new generate-bindings download-cleanup
 
 ci-debian-setup:
     echo "Installing dependencies..."
