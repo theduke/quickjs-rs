@@ -139,7 +139,6 @@ pub const JS_EVAL_TYPE_MODULE: u32 = 1;
 pub const JS_EVAL_TYPE_DIRECT: u32 = 2;
 pub const JS_EVAL_TYPE_INDIRECT: u32 = 3;
 pub const JS_EVAL_TYPE_MASK: u32 = 3;
-pub const JS_EVAL_FLAG_SHEBANG: u32 = 4;
 pub const JS_EVAL_FLAG_STRICT: u32 = 8;
 pub const JS_EVAL_FLAG_STRIP: u32 = 16;
 pub const JS_EVAL_FLAG_COMPILE_ONLY: u32 = 32;
@@ -2810,6 +2809,9 @@ extern "C" {
 }
 extern "C" {
     pub fn JS_GetArrayBuffer(ctx: *mut JSContext, psize: *mut usize, obj: JSValue) -> *mut u8;
+}
+extern "C" {
+    pub fn JS_NewPromiseCapability(ctx: *mut JSContext, resolving_funcs: *mut JSValue) -> JSValue;
 }
 pub type JSInterruptHandler = ::std::option::Option<
     unsafe extern "C" fn(
