@@ -244,6 +244,10 @@ impl<'a> OwnedValueRef<'a> {
         v
     }
 
+    pub fn is_null(&self) -> bool {
+        self.value.tag == TAG_NULL
+    }
+
     pub fn is_exception(&self) -> bool {
         self.value.tag == TAG_EXCEPTION
     }
@@ -592,18 +596,36 @@ impl ContextWrapper {
         Ok(global)
     }
 
-    /// Get the last exception.
-    /// NOTE: currently this is useless in eval, since the exception is
-    /// swallowed.
-    fn get_exception<'a>(&'a self) -> Result<OwnedValueRef<'a>, ExecutionError> {
+    /// Get the last exception from the runtime, and if present, convert it to a ExceptionError.
+    fn get_exception<'a>(&'a self) -> Option<ExecutionError> {
         let raw = unsafe { q::JS_GetException(self.context) };
         let value = OwnedValueRef::new(self, raw);
-        if value.is_exception() {
-            Err(ExecutionError::Exception(
-                "Could not get last exception".into(),
-            ))
+
+        if value.is_null() {
+            None
         } else {
-            Ok(value)
+            let err = if value.is_exception() {
+                ExecutionError::Internal("Could get exception from runtime".into())
+            } else {
+                match value.to_value() {
+                    Ok(e) => ExecutionError::Exception(e),
+                    Err(_) => {
+                        match value.to_string() {
+                            Ok(strval) => {
+                                if strval.contains("out of memory") {
+                                    ExecutionError::OutOfMemory
+                                } else {
+                                    ExecutionError::Exception(JsValue::String(strval))
+                                }
+                            }
+                            Err(_) => {
+                                ExecutionError::Internal("Unknown exception".into())
+                            }
+                        }
+                    }
+                }
+            };
+            Some(err)
         }
     }
 
@@ -626,14 +648,10 @@ impl ContextWrapper {
         let value = OwnedValueRef::new(self, value_raw);
 
         if value.is_exception() {
-            let exception = self.get_exception().and_then(|e| match e.to_value() {
-                Ok(e) => Ok(e),
-                Err(_e) => e
-                    .to_string()
-                    .map(JsValue::String)
-                    .map_err(|_| ExecutionError::Internal("Unknown exception".into())),
-            })?;
-            Err(ExecutionError::Exception(exception))
+            let err = self
+                .get_exception()
+                .unwrap_or_else(|| ExecutionError::Exception("Unknown exception".into()));
+            Err(err)
         } else {
             Ok(value)
         }
@@ -664,11 +682,10 @@ impl ContextWrapper {
         let qres = OwnedValueRef::new(self, qres_raw);
 
         if qres.is_exception() {
-            let exception = self
+            let err = self
                 .get_exception()
-                .and_then(|e| e.to_value().map_err(ExecutionError::Conversion))
-                .map_err(|_| ExecutionError::Internal("Unknown Exception".to_string()))?;
-            Err(ExecutionError::Exception(exception))
+                .unwrap_or_else(|| ExecutionError::Exception("Unknown exception".into()));
+            Err(err)
         } else {
             Ok(qres)
         }
