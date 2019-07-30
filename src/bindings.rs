@@ -340,6 +340,7 @@ impl<'a> OwnedObjectRef<'a> {
 ///
 /// Cleanup of the context happens in drop.
 pub struct ContextWrapper {
+    runtime: *mut q::JSRuntime,
     context: *mut q::JSContext,
     /// Stores callback closures and quickjs data pointers.
     /// This array is write-only and only exists to ensure the lifetime of
@@ -351,25 +352,25 @@ pub struct ContextWrapper {
 impl Drop for ContextWrapper {
     fn drop(&mut self) {
         unsafe {
-            let rt = q::JS_GetRuntime(self.context);
             q::JS_FreeContext(self.context);
-            q::JS_FreeRuntime(rt);
+            q::JS_FreeRuntime(self.runtime);
         }
     }
 }
 
 impl ContextWrapper {
     pub fn new() -> Result<Self, ContextError> {
-        let rt = unsafe { q::JS_NewRuntime() };
-        if rt.is_null() {
+        let runtime = unsafe { q::JS_NewRuntime() };
+        if runtime.is_null() {
             return Err(ContextError::RuntimeCreationFailed);
         }
-        let context = unsafe { q::JS_NewContext(rt) };
+        let context = unsafe { q::JS_NewContext(runtime) };
         if context.is_null() {
             return Err(ContextError::ContextCreationFailed);
         }
 
         Ok(Self {
+            runtime,
             context,
             callbacks: Mutex::new(Vec::new()),
         })
@@ -398,8 +399,8 @@ impl ContextWrapper {
                 tag: TAG_FLOAT64,
             },
             JsValue::String(val) => {
-                let cstr = make_cstring(val)?;
-                let qval = unsafe { q::JS_NewString(context, cstr.as_ptr()) };
+                let len = val.len();
+                let qval = unsafe { q::JS_NewStringLen(context, val.as_ptr() as *const i8, len as std::os::raw::c_int) };
 
                 if qval.tag == TAG_EXCEPTION {
                     return Err(ValueError::Internal(
