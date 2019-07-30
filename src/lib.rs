@@ -38,11 +38,12 @@
 #![deny(missing_docs)]
 
 mod bindings;
+mod callback;
 mod value;
 
 use std::{convert::TryFrom, error, fmt};
 
-pub use bindings::Callback;
+pub use callback::Callback;
 pub use value::*;
 
 /// Error on Javascript execution.
@@ -69,7 +70,7 @@ impl fmt::Display for ExecutionError {
             InputWithZeroBytes => write!(f, "Invalid script input: code contains zero byte (\\0)"),
             Conversion(e) => e.fmt(f),
             Internal(e) => write!(f, "Internal error: {}", e),
-            Exception(e) => write!(f, "Execution failed with exception: {:?}", e),
+            Exception(e) => write!(f, "{:?}", e),
             OutOfMemory => write!(f, "Out of memory: runtime memory limit exceeded"),
             __NonExhaustive => unreachable!(),
         }
@@ -274,6 +275,15 @@ impl Context {
 
     /// Add a global JS function that is backed by a Rust function or closure.
     ///
+    /// The callback must satisfy several requirements:
+    /// * accepts 0 - 5 arguments
+    /// * each argument must be convertible from a JsValue
+    /// * must return a value
+    /// * the return value must either:
+    ///   - be convertible to JsValue
+    ///   - be a Result<T, E> where T is convertible to JsValue
+    ///     if Err(e) is returned, a Javascript exception will be raised
+    ///
     /// ```rust
     /// use quick_js::{Context, JsValue};
     /// let context = Context::new().unwrap();
@@ -292,7 +302,7 @@ impl Context {
     pub fn add_callback<F>(
         &self,
         name: &str,
-        callback: impl bindings::Callback<F> + 'static,
+        callback: impl Callback<F> + 'static,
     ) -> Result<(), ExecutionError> {
         self.wrapper.add_callback(name, callback)
     }
@@ -472,6 +482,56 @@ mod tests {
     }
 
     #[test]
+    fn test_callback_argn_variants() {
+        macro_rules! callback_argn_tests {
+            [
+                $(
+                    $len:literal : ( $( $argn:ident : $argv:literal ),* ),
+                )*
+            ] => {
+                $(
+                   {
+                       // Test plain return type.
+                        let name = format!("cb{}", $len);
+                        let c = Context::new().unwrap();
+                        c.add_callback(&name, | $( $argn : i32 ),*| -> i32 {
+                            $( $argn + )* 0
+                        }).unwrap();
+
+                        let code = format!("{}( {} )", name, "1,".repeat($len));
+                        let v = c.eval(&code).unwrap();
+                        assert_eq!(v, JsValue::Int($len));
+
+                        // Test Result<T, E> return type with OK(_) returns.
+                        let name = format!("cbres{}", $len);
+                        c.add_callback(&name, | $( $argn : i32 ),*| -> Result<i32, String> {
+                            Ok($( $argn + )* 0)
+                        }).unwrap();
+
+                        let code = format!("{}( {} )", name, "1,".repeat($len));
+                        let v = c.eval(&code).unwrap();
+                        assert_eq!(v, JsValue::Int($len));
+
+                        // Test Result<T, E> return type with Err(_) returns.
+                        let name = format!("cbreserr{}", $len);
+                        c.add_callback(&name, #[allow(unused_variables)] | $( $argn : i32 ),*| -> Result<i32, String> {
+                            Err("error".into())
+                        }).unwrap();
+
+                        let code = format!("{}( {} )", name, "1,".repeat($len));
+                        let res = c.eval(&code);
+                        assert_eq!(res, Err(ExecutionError::Exception("error".into())));
+                   }
+                )*
+            }
+        }
+
+        callback_argn_tests![
+            1: (a : 1),
+        ]
+    }
+
+    #[test]
     fn test_callback_invalid_argcount() {
         let c = Context::new().unwrap();
 
@@ -480,7 +540,7 @@ mod tests {
         assert_eq!(
             c.eval(" cb(5) "),
             Err(ExecutionError::Exception(
-                "Internal error: Invalid argument count: Expected 2, got 1".into()
+                "Invalid argument count: Expected 2, got 1".into()
             )),
         );
     }
