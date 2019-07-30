@@ -13,21 +13,21 @@
 //!
 //! ```rust
 //! use quick_js::{Context, JsValue};
-//! 
+//!
 //! let context = Context::new().unwrap();
-//! 
+//!
 //! // Eval.
-//! 
+//!
 //! let value = context.eval("1 + 2").unwrap();
 //! assert_eq!(value, JsValue::Int(3));
-//! 
+//!
 //! let value = context.eval_as::<String>(" var x = 100 + 250; x.toString() ").unwrap();
 //! assert_eq!(&value, "350");
-//! 
+//!
 //! // Callbacks.
-//! 
+//!
 //! context.add_callback("myCallback", |a: i32, b: i32| a + b).unwrap();
-//! 
+//!
 //! context.eval(r#"
 //!     // x will equal 30
 //!     var x = myCallback(10, 20);
@@ -100,9 +100,7 @@ pub struct ContextBuilder {
 
 impl ContextBuilder {
     fn new() -> Self {
-        Self{
-            memory_limit: None,
-        }
+        Self { memory_limit: None }
     }
 
     /// Sets the memory limit of the Javascript runtime (in bytes).
@@ -130,9 +128,7 @@ pub struct Context {
 
 impl Context {
     fn from_wrapper(wrapper: bindings::ContextWrapper) -> Self {
-        Self {
-            wrapper,
-        }
+        Self { wrapper }
     }
 
     /// Create a `ContextBuilder` that allows customization of JS Runtime settings.
@@ -160,7 +156,7 @@ impl Context {
     /// All state and callbacks will be removed.
     pub fn reset(self) -> Result<Self, ContextError> {
         let wrapper = self.wrapper.reset()?;
-        Ok(Self{ wrapper })
+        Ok(Self { wrapper })
     }
 
     /// Evaluates Javascript code and returns the value of the final expression.
@@ -480,7 +476,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn context_reset() {
         let c = Context::new().unwrap();
@@ -497,10 +492,10 @@ mod tests {
 
         // Check old state is gone.
         let err_msg = c2.eval(" x ").unwrap_err().to_string();
-        assert!( err_msg.contains("ReferenceError") );
+        assert!(err_msg.contains("ReferenceError"));
 
         // Check callback is gone.
         let err_msg = c2.eval(" myCallback() ").unwrap_err().to_string();
-        assert!( err_msg.contains("ReferenceError") );
+        assert!(err_msg.contains("ReferenceError"));
     }
 }

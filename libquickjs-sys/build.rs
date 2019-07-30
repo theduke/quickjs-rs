@@ -19,7 +19,6 @@ fn main() {
     #[cfg(not(feature = "bindgen"))]
     panic!("Invalid configuration for libquickjs-sys: Must either enable the bundled or the bindgen feature");
 
-
     let lib = if cfg!(unix) {
         if exists("/usr/lib/quickjs/libquickjs.a") {
             "/usr/lib/quickjs"
@@ -29,7 +28,7 @@ fn main() {
             panic!("quicks is not supported on this platform");
         }
     } else {
-            panic!("quickjs error: Windows is not supported yet");
+        panic!("quickjs error: Windows is not supported yet");
     };
 
     // Generate bindings.
@@ -72,6 +71,9 @@ fn main() {
         .expect("Could not copy bindings.rs");
 
     // Instruct cargo to statically link quickjs.
-    println!("cargo:rustc-link-search=native={}", code_dir.to_str().unwrap());
+    println!(
+        "cargo:rustc-link-search=native={}",
+        code_dir.to_str().unwrap()
+    );
     println!("cargo:rustc-link-lib=static=quickjs");
 }
