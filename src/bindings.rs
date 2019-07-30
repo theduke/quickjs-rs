@@ -390,6 +390,20 @@ impl ContextWrapper {
         })
     }
 
+    /// Reset the wrapper by creating a new context.
+    pub fn reset(self) -> Result<Self, ContextError> {
+        unsafe { q::JS_FreeContext(self.context); };
+        self.callbacks.lock().unwrap().clear();
+        let context = unsafe { q::JS_NewContext(self.runtime) };
+        if context.is_null() {
+            return Err(ContextError::ContextCreationFailed);
+        }
+
+        let mut s = self;
+        s.context = context;
+        Ok(s)
+    }
+
     /// Serialize a Rust value into a quickjs runtime value.
     pub fn serialize_value<'a>(&'a self, value: JsValue) -> Result<OwnedValueRef<'a>, ValueError> {
         let context = self.context;

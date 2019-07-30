@@ -155,6 +155,14 @@ impl Context {
         Ok(Self::from_wrapper(wrapper))
     }
 
+    /// Reset the Javascript engine.
+    ///
+    /// All state and callbacks will be removed.
+    pub fn reset(self) -> Result<Self, ContextError> {
+        let wrapper = self.wrapper.reset()?;
+        Ok(Self{ wrapper })
+    }
+
     /// Evaluates Javascript code and returns the value of the final expression.
     ///
     /// ```rust
@@ -473,4 +481,26 @@ mod tests {
     }
 
 
+    #[test]
+    fn context_reset() {
+        let c = Context::new().unwrap();
+        c.eval(" var x = 123; ").unwrap();
+        c.add_callback("myCallback", || true).unwrap();
+
+        let c2 = c.reset().unwrap();
+
+        // Check it still works.
+        assert_eq!(
+            c2.eval_as::<String>(" 'abc'.repeat(2) ").unwrap(),
+            "abcabc".to_string(),
+        );
+
+        // Check old state is gone.
+        let err_msg = c2.eval(" x ").unwrap_err().to_string();
+        assert!( err_msg.contains("ReferenceError") );
+
+        // Check callback is gone.
+        let err_msg = c2.eval(" myCallback() ").unwrap_err().to_string();
+        assert!( err_msg.contains("ReferenceError") );
+    }
 }
