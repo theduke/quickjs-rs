@@ -51,6 +51,7 @@ pub enum ExecutionError {
     Conversion(ValueError),
     Internal(String),
     Exception(JsValue),
+    OutOfMemory,
 }
 
 impl fmt::Display for ExecutionError {
@@ -61,6 +62,7 @@ impl fmt::Display for ExecutionError {
             Conversion(e) => e.fmt(f),
             Internal(e) => write!(f, "Internal error: {}", e),
             Exception(e) => write!(f, "Execution failed with exception: {:?}", e),
+            OutOfMemory => write!(f, "Out of memory: runtime memory limit exceeded"),
         }
     }
 }
@@ -92,6 +94,34 @@ impl fmt::Display for ContextError {
 
 impl error::Error for ContextError {}
 
+pub struct ContextBuilder {
+    memory_limit: Option<usize>,
+}
+
+impl ContextBuilder {
+    fn new() -> Self {
+        Self{
+            memory_limit: None,
+        }
+    }
+
+    /// Sets the memory limit of the Javascript runtime (in bytes).
+    ///
+    /// If the limit is exceeded, methods like `eval` will return
+    /// a `Err(ExecutionError::Exception(JsValue::Null))`
+    // TODO: investigate why we don't get a proper exception message here.
+    pub fn memory_limit(self, max_bytes: usize) -> Self {
+        let mut s = self;
+        s.memory_limit = Some(max_bytes);
+        s
+    }
+
+    pub fn build(self) -> Result<Context, ContextError> {
+        let wrapper = bindings::ContextWrapper::new(self.memory_limit)?;
+        Ok(Context::from_wrapper(wrapper))
+    }
+}
+
 /// Context is a wrapper around a QuickJS Javascript context.
 /// It is the primary way to interact with the runtime.
 pub struct Context {
@@ -99,11 +129,30 @@ pub struct Context {
 }
 
 impl Context {
-    /// Create a new Javascript context.
+    fn from_wrapper(wrapper: bindings::ContextWrapper) -> Self {
+        Self {
+            wrapper,
+        }
+    }
+
+    /// Create a `ContextBuilder` that allows customization of JS Runtime settings.
+    ///
+    /// For details, see the methods on `ContextBuilder`.
+    ///
+    /// ```rust
+    /// let _context = quick_js::Context::builder()
+    ///     .memory_limit(100_000)
+    ///     .build()
+    ///     .unwrap();
+    /// ```
+    pub fn builder() -> ContextBuilder {
+        ContextBuilder::new()
+    }
+
+    /// Create a new Javascript context with default settings.
     pub fn new() -> Result<Self, ContextError> {
-        Ok(Self {
-            wrapper: bindings::ContextWrapper::new()?,
-        })
+        let wrapper = bindings::ContextWrapper::new(None)?;
+        Ok(Self::from_wrapper(wrapper))
     }
 
     /// Evaluates Javascript code and returns the value of the final expression.
@@ -414,6 +463,14 @@ mod tests {
         );
     }
 
+    #[test]
+    fn memory_limit_exceeded() {
+        let c = Context::builder().memory_limit(100_000).build().unwrap();
+        assert_eq!(
+            c.eval("  'abc'.repeat(200_000) "),
+            Err(ExecutionError::OutOfMemory),
+        );
+    }
 
 
 }

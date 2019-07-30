@@ -363,15 +363,25 @@ impl Drop for ContextWrapper {
 }
 
 impl ContextWrapper {
-    pub fn new() -> Result<Self, ContextError> {
+    /// Initialize a wrapper by creating a JSRuntime and JSContext.
+    pub fn new(memory_limit: Option<usize>) -> Result<Self, ContextError> {
         let runtime = unsafe { q::JS_NewRuntime() };
         if runtime.is_null() {
             return Err(ContextError::RuntimeCreationFailed);
         }
+
+        // Configure memory limit if specified.
+        if let Some(limit) = memory_limit {
+            unsafe {
+                q::JS_SetMemoryLimit(runtime, limit);
+            }
+        }
+
         let context = unsafe { q::JS_NewContext(runtime) };
         if context.is_null() {
             return Err(ContextError::ContextCreationFailed);
         }
+
 
         Ok(Self {
             runtime,
