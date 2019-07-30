@@ -382,7 +382,6 @@ impl ContextWrapper {
             return Err(ContextError::ContextCreationFailed);
         }
 
-
         Ok(Self {
             runtime,
             context,
@@ -392,7 +391,9 @@ impl ContextWrapper {
 
     /// Reset the wrapper by creating a new context.
     pub fn reset(self) -> Result<Self, ContextError> {
-        unsafe { q::JS_FreeContext(self.context); };
+        unsafe {
+            q::JS_FreeContext(self.context);
+        };
         self.callbacks.lock().unwrap().clear();
         let context = unsafe { q::JS_NewContext(self.runtime) };
         if context.is_null() {
@@ -428,7 +429,13 @@ impl ContextWrapper {
             },
             JsValue::String(val) => {
                 let len = val.len();
-                let qval = unsafe { q::JS_NewStringLen(context, val.as_ptr() as *const i8, len as std::os::raw::c_int) };
+                let qval = unsafe {
+                    q::JS_NewStringLen(
+                        context,
+                        val.as_ptr() as *const i8,
+                        len as std::os::raw::c_int,
+                    )
+                };
 
                 if qval.tag == TAG_EXCEPTION {
                     return Err(ValueError::Internal(
@@ -633,20 +640,16 @@ impl ContextWrapper {
             } else {
                 match value.to_value() {
                     Ok(e) => ExecutionError::Exception(e),
-                    Err(_) => {
-                        match value.to_string() {
-                            Ok(strval) => {
-                                if strval.contains("out of memory") {
-                                    ExecutionError::OutOfMemory
-                                } else {
-                                    ExecutionError::Exception(JsValue::String(strval))
-                                }
-                            }
-                            Err(_) => {
-                                ExecutionError::Internal("Unknown exception".into())
+                    Err(_) => match value.to_string() {
+                        Ok(strval) => {
+                            if strval.contains("out of memory") {
+                                ExecutionError::OutOfMemory
+                            } else {
+                                ExecutionError::Exception(JsValue::String(strval))
                             }
                         }
-                    }
+                        Err(_) => ExecutionError::Internal("Unknown exception".into()),
+                    },
                 }
             };
             Some(err)
