@@ -52,6 +52,8 @@ pub enum ExecutionError {
     Internal(String),
     Exception(JsValue),
     OutOfMemory,
+    #[doc(hidden)]
+    __NonExhaustive,
 }
 
 impl fmt::Display for ExecutionError {
@@ -63,6 +65,7 @@ impl fmt::Display for ExecutionError {
             Internal(e) => write!(f, "Internal error: {}", e),
             Exception(e) => write!(f, "Execution failed with exception: {:?}", e),
             OutOfMemory => write!(f, "Out of memory: runtime memory limit exceeded"),
+            __NonExhaustive => unreachable!(),
         }
     }
 }
@@ -80,6 +83,8 @@ impl From<ValueError> for ExecutionError {
 pub enum ContextError {
     RuntimeCreationFailed,
     ContextCreationFailed,
+    #[doc(hidden)]
+    __NonExhaustive,
 }
 
 impl fmt::Display for ContextError {
@@ -88,6 +93,7 @@ impl fmt::Display for ContextError {
         match self {
             RuntimeCreationFailed => write!(f, "Could not create runtime"),
             ContextCreationFailed => write!(f, "Could not create context"),
+            __NonExhaustive => unreachable!(),
         }
     }
 }

@@ -123,6 +123,8 @@ pub enum ValueError {
     StringWithZeroBytes(std::ffi::NulError),
     Internal(String),
     UnexpectedType,
+    #[doc(hidden)]
+    __NonExhaustive,
 }
 
 // TODO: remove this once either the Never type get's stabilized or the compiler
@@ -145,6 +147,7 @@ impl fmt::Display for ValueError {
             StringWithZeroBytes(_) => write!(f, "String contains \\0 bytes",),
             Internal(e) => write!(f, "Value conversion failed - internal error: {}", e),
             UnexpectedType => write!(f, "Could not convert - received unexpected type"),
+            __NonExhaustive => unreachable!(),
         }
     }
 }
