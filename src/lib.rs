@@ -241,7 +241,7 @@ impl Context {
     ///
     /// ```rust
     /// use quick_js::{Context, JsValue};
-    /// let context = Context::new().unwrap();
+    /// let mut context = Context::new().unwrap();
     ///
     /// let res = context.call_function("encodeURIComponent", vec!["a=b"]);
     /// assert_eq!(
@@ -250,7 +250,7 @@ impl Context {
     /// );
     /// ```
     pub fn call_function(
-        &self,
+        &mut self,
         function_name: &str,
         args: impl IntoIterator<Item = impl Into<JsValue>>,
     ) -> Result<JsValue, ExecutionError> {
