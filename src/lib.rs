@@ -212,7 +212,7 @@ impl Context {
     ///
     /// ```rust
     /// use quick_js::{Context};
-    /// let context = Context::new().unwrap();
+    /// let mut context = Context::new().unwrap();
     ///
     /// let res = context.eval_as::<bool>(" 100 > 10 ");
     /// assert_eq!(
@@ -226,7 +226,7 @@ impl Context {
     ///     20,
     /// );
     /// ```
-    pub fn eval_as<R>(&self, code: &str) -> Result<R, ExecutionError>
+    pub fn eval_as<R>(&mut self, code: &str) -> Result<R, ExecutionError>
     where
         R: TryFrom<JsValue>,
         R::Error: Into<ValueError>,
@@ -286,7 +286,7 @@ impl Context {
     ///
     /// ```rust
     /// use quick_js::{Context, JsValue};
-    /// let context = Context::new().unwrap();
+    /// let mut context = Context::new().unwrap();
     ///
     /// // Register a closue as a callback under the "add" name.
     /// // The 'add' function can now be called from Javascript code.
