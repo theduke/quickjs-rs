@@ -28,7 +28,7 @@ quick-js = "0.2.0"
 ```rust
 use quick_js::{Context, JsValue};
 
-let context = Context::new().unwrap();
+let mut context = Context::new().unwrap();
 
 // Eval.
 
