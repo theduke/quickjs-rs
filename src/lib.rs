@@ -14,7 +14,7 @@
 //! ```rust
 //! use quick_js::{Context, JsValue};
 //!
-//! let context = Context::new().unwrap();
+//! let mut context = Context::new().unwrap();
 //!
 //! // Eval.
 //!
@@ -182,7 +182,7 @@ impl Context {
     ///
     /// ```rust
     /// use quick_js::{Context, JsValue};
-    /// let context = Context::new().unwrap();
+    /// let mut context = Context::new().unwrap();
     ///
     /// let value = context.eval(" 1 + 2 + 3 ");
     /// assert_eq!(
@@ -201,7 +201,7 @@ impl Context {
     ///     Ok(JsValue::String("165!".to_string())),
     /// );
     /// ```
-    pub fn eval(&self, code: &str) -> Result<JsValue, ExecutionError> {
+    pub fn eval(&mut self, code: &str) -> Result<JsValue, ExecutionError> {
         let value_raw = self.wrapper.eval(code)?;
         let value = value_raw.to_value()?;
         Ok(value)
@@ -332,7 +332,7 @@ mod tests {
 
     #[test]
     fn test_eval_pass() {
-        let c = Context::new().unwrap();
+        let mut c = Context::new().unwrap();
 
         let cases = vec![
             ("null", Ok(JsValue::Null)),
@@ -362,7 +362,7 @@ mod tests {
 
     #[test]
     fn test_eval_syntax_error() {
-        let c = Context::new().unwrap();
+        let mut c = Context::new().unwrap();
         assert_eq!(
             c.eval(
                 r#"
@@ -377,7 +377,7 @@ mod tests {
 
     #[test]
     fn test_eval_exception() {
-        let c = Context::new().unwrap();
+        let mut c = Context::new().unwrap();
         assert_eq!(
             c.eval(
                 r#"
@@ -393,7 +393,7 @@ mod tests {
 
     #[test]
     fn test_call() {
-        let c = Context::new().unwrap();
+        let mut c = Context::new().unwrap();
 
         assert_eq!(
             c.call_function("parseInt", vec!["22"]).unwrap(),
@@ -454,7 +454,7 @@ mod tests {
 
     #[test]
     fn test_call_large_string() {
-        let c = Context::new().unwrap();
+        let mut c = Context::new().unwrap();
         c.eval(" function strLen(s) { return s.length; } ").unwrap();
 
         let s = " ".repeat(200_000);
@@ -464,7 +464,7 @@ mod tests {
 
     #[test]
     fn test_callback() {
-        let c = Context::new().unwrap();
+        let mut c = Context::new().unwrap();
 
         c.add_callback("cb1", |flag: bool| !flag).unwrap();
         assert_eq!(c.eval("cb1(true)").unwrap(), JsValue::Bool(false),);
@@ -493,7 +493,7 @@ mod tests {
                    {
                        // Test plain return type.
                         let name = format!("cb{}", $len);
-                        let c = Context::new().unwrap();
+                        let mut c = Context::new().unwrap();
                         c.add_callback(&name, | $( $argn : i32 ),*| -> i32 {
                             $( $argn + )* 0
                         }).unwrap();
@@ -533,7 +533,7 @@ mod tests {
 
     #[test]
     fn test_callback_invalid_argcount() {
-        let c = Context::new().unwrap();
+        let mut c = Context::new().unwrap();
 
         c.add_callback("cb", |a: i32, b: i32| a + b).unwrap();
 
@@ -547,7 +547,7 @@ mod tests {
 
     #[test]
     fn memory_limit_exceeded() {
-        let c = Context::builder().memory_limit(100_000).build().unwrap();
+        let mut c = Context::builder().memory_limit(100_000).build().unwrap();
         assert_eq!(
             c.eval("  'abc'.repeat(200_000) "),
             Err(ExecutionError::OutOfMemory),
@@ -556,11 +556,11 @@ mod tests {
 
     #[test]
     fn context_reset() {
-        let c = Context::new().unwrap();
+        let mut c = Context::new().unwrap();
         c.eval(" var x = 123; ").unwrap();
         c.add_callback("myCallback", || true).unwrap();
 
-        let c2 = c.reset().unwrap();
+        let mut c2 = c.reset().unwrap();
 
         // Check it still works.
         assert_eq!(
@@ -579,7 +579,7 @@ mod tests {
 
     #[inline(never)]
     fn build_context() -> Context {
-        let ctx = Context::new().unwrap();
+        let mut ctx = Context::new().unwrap();
         let name = "cb".to_string();
         ctx.add_callback(&name, |a: String| a.repeat(2)).unwrap();
 
@@ -591,7 +591,7 @@ mod tests {
 
     #[test]
     fn moved_context() {
-        let c = build_context();
+        let mut c = build_context();
         let v = c.call_function("f", vec!["test"]).unwrap();
         assert_eq!(v, "testtest".into());
 
