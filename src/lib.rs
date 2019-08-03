@@ -300,7 +300,7 @@ impl Context {
     /// );
     /// ```
     pub fn add_callback<F>(
-        &self,
+        &mut self,
         name: &str,
         callback: impl Callback<F> + 'static,
     ) -> Result<(), ExecutionError> {
