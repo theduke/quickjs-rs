@@ -39,9 +39,10 @@
 
 mod bindings;
 mod callback;
+mod module_loader;
 mod value;
 
-use std::{convert::TryFrom, error, fmt};
+use std::{collections::HashMap, convert::TryFrom, error, fmt, path::PathBuf};
 
 pub use callback::Callback;
 pub use value::*;
@@ -59,6 +60,11 @@ pub enum ExecutionError {
     Exception(JsValue),
     /// JS Runtime exceeded the memory limit.
     OutOfMemory,
+    /// Module could not be found.
+    ModuleNotFound {
+        /// Name of the module.
+        name: String,
+    },
     #[doc(hidden)]
     __NonExhaustive,
 }
@@ -72,6 +78,7 @@ impl fmt::Display for ExecutionError {
             Internal(e) => write!(f, "Internal error: {}", e),
             Exception(e) => write!(f, "{:?}", e),
             OutOfMemory => write!(f, "Out of memory: runtime memory limit exceeded"),
+            ModuleNotFound { ref name } => write!(f, "Module could not be found: '{}'", name),
             __NonExhaustive => unreachable!(),
         }
     }
@@ -114,11 +121,17 @@ impl error::Error for ContextError {}
 /// Create with [Context::builder](Context::builder).
 pub struct ContextBuilder {
     memory_limit: Option<usize>,
+    module_load_paths: Vec<PathBuf>,
+    embedded_modules: HashMap<String, String>,
 }
 
 impl ContextBuilder {
     fn new() -> Self {
-        Self { memory_limit: None }
+        Self {
+            memory_limit: None,
+            module_load_paths: Vec::new(),
+            embedded_modules: HashMap::new(),
+        }
     }
 
     /// Sets the memory limit of the Javascript runtime (in bytes).
@@ -132,9 +145,43 @@ impl ContextBuilder {
         s
     }
 
+    /// Register module load paths.
+    /// When executing code with [Context::eval_module] the given paths will
+    /// be used for loading module files.
+    pub fn module_load_paths<I, T>(self, paths: I) -> Self
+    where
+        T: Into<PathBuf>,
+        I: IntoIterator<Item = T>,
+    {
+        let mut s = self;
+        s.module_load_paths = paths.into_iter().map(Into::into).collect();
+        s
+    }
+
+    /// Embed JS module code.
+    /// The given map must be a mapping of [module_name => module_code].
+    ///
+    /// This is a static alternative to [ContextBuilder::module_paths] that
+    /// allows providing modules without file system access.
+    pub fn embedded_modules(self, modules: HashMap<String, String>) -> Self {
+        let mut s = self;
+        s.embedded_modules = modules;
+        s
+    }
+
     /// Finalize the builder and build a JS Context.
     pub fn build(self) -> Result<Context, ContextError> {
-        let wrapper = bindings::ContextWrapper::new(self.memory_limit)?;
+        let loader = if !self.module_load_paths.is_empty() || !self.embedded_modules.is_empty() {
+            let loader = crate::module_loader::ModuleLoader::new();
+            loader.add_paths(self.module_load_paths);
+            loader.add_embedded(self.embedded_modules);
+            Some(Box::new(loader))
+        } else {
+            None
+        };
+
+        let wrapper = bindings::ContextWrapper::new(self.memory_limit, loader)?;
+
         Ok(Context::from_wrapper(wrapper))
     }
 }
@@ -166,7 +213,7 @@ impl Context {
 
     /// Create a new Javascript context with default settings.
     pub fn new() -> Result<Self, ContextError> {
-        let wrapper = bindings::ContextWrapper::new(None)?;
+        let wrapper = bindings::ContextWrapper::new(None, None)?;
         Ok(Self::from_wrapper(wrapper))
     }
 
@@ -178,7 +225,11 @@ impl Context {
         Ok(Self { wrapper })
     }
 
-    /// Evaluates Javascript code and returns the value of the final expression.
+    /// Evaluates Javascript code in the **global scope** and returns the
+    /// value of the final expression.
+    ///
+    /// NOTE: Module imports do not work in the global scope.
+    /// If you want to use modules, see [eval_module].
     ///
     /// ```rust
     /// use quick_js::{Context, JsValue};
@@ -203,6 +254,35 @@ impl Context {
     /// ```
     pub fn eval(&self, code: &str) -> Result<JsValue, ExecutionError> {
         let value_raw = self.wrapper.eval(code)?;
+        let value = value_raw.to_value()?;
+        Ok(value)
+    }
+
+    /// Evaluates Javascript code as a module and returns the value of the final expression.
+    ///
+    /// ```rust
+    /// use quick_js::{Context, JsValue};
+    /// let context = Context::new().unwrap();
+    ///
+    /// let value = context.eval(" 1 + 2 + 3 ");
+    /// assert_eq!(
+    ///     value,
+    ///     Ok(JsValue::Int(6)),
+    /// );
+    ///
+    /// let value = context.eval(r#"
+    ///     function f() { return 55 * 3; }
+    ///     let y = f();
+    ///     var x = y.toString() + "!"
+    ///     x
+    /// "#);
+    /// assert_eq!(
+    ///     value,
+    ///     Ok(JsValue::String("165!".to_string())),
+    /// );
+    /// ```
+    pub fn eval_module(&self, code: &str) -> Result<JsValue, ExecutionError> {
+        let value_raw = self.wrapper.eval_module(code)?;
         let value = value_raw.to_value()?;
         Ok(value)
     }
@@ -329,6 +409,29 @@ mod tests {
     //         JsValue::Bool(true),
     //     );
     // }
+    //
+
+    #[test]
+    fn eval_global() {
+        let mut mods = std::collections::HashMap::new();
+        mods.insert(
+            "some_module.js".to_string(),
+            "export const X = 33; ".to_string(),
+        );
+
+        let c = Context::builder().embedded_modules(mods).build().unwrap();
+
+        assert_eq!(
+            c.eval_module(
+                r#"
+                import {X} from 'some_module.js';
+                X
+              "#
+            )
+            .unwrap(),
+            JsValue::Int(33),
+        );
+    }
 
     #[test]
     fn test_eval_pass() {
@@ -349,8 +452,8 @@ mod tests {
             ),
         ];
 
-        for (code, res) in cases.into_iter() {
-            assert_eq!(c.eval(code), res,);
+        for (code, res) in cases.iter() {
+            assert_eq!(&c.eval(code), res,);
         }
 
         assert_eq!(c.eval_as::<bool>("true").unwrap(), true,);

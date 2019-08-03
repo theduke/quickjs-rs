@@ -1,12 +1,15 @@
 use std::{
     ffi::CString,
-    os::raw::{c_int, c_void},
+    os::raw::{c_char, c_int, c_void},
     sync::Mutex,
 };
 
 use libquickjs_sys as q;
 
-use crate::{callback::Callback, ContextError, ExecutionError, JsValue, ValueError};
+use crate::{
+    callback::Callback, module_loader::ModuleLoader, ContextError, ExecutionError, JsValue,
+    ValueError,
+};
 
 // JS_TAG_* constants from quickjs.
 // For some reason bindgen does not pick them up.
@@ -266,6 +269,62 @@ fn make_cstring(value: impl Into<Vec<u8>>) -> Result<CString, ValueError> {
     CString::new(value).map_err(ValueError::StringWithZeroBytes)
 }
 
+extern "C" fn module_loader(
+    ctx: *mut q::JSContext,
+    module_name_raw: *const c_char,
+    opaque: *mut c_void,
+) -> *mut q::JSModuleDef {
+    let name_res = unsafe { std::ffi::CStr::from_ptr(module_name_raw) }.to_str();
+    let name = match name_res {
+        Ok(name) => name,
+        Err(_) => {
+            let msg = JsValue::from("Could not load module: invalid non-utf8 module name");
+            let msg = serialize_value(ctx, msg).unwrap_or(q::JSValue {
+                u: q::JSValueUnion { int32: 0 },
+                tag: TAG_NULL,
+            });
+            unsafe { q::JS_Throw(ctx, msg) };
+            return std::ptr::null_mut();
+        }
+    };
+
+    let loader: &ModuleLoader = unsafe { &*(opaque as *const ModuleLoader) };
+
+    let code = match loader.load(name) {
+        Ok(code) => code,
+        Err(e) => {
+            let msg = JsValue::from(format!("{}", e));
+            let msg = serialize_value(ctx, msg).unwrap_or(q::JSValue {
+                u: q::JSValueUnion { int32: 0 },
+                tag: TAG_NULL,
+            });
+            unsafe { q::JS_Throw(ctx, msg) };
+            return std::ptr::null_mut();
+        }
+    };
+
+    // Eval module.
+
+    let code_c = make_cstring(code.as_str()).unwrap();
+
+    let value_raw = unsafe {
+        q::JS_Eval(
+            ctx,
+            code_c.as_ptr(),
+            code.len(),
+            module_name_raw,
+            (q::JS_EVAL_TYPE_MODULE | q::JS_EVAL_FLAG_COMPILE_ONLY) as i32,
+        )
+    };
+    if value_raw.tag == TAG_EXCEPTION {
+        std::ptr::null_mut()
+    } else {
+        let module = unsafe { value_raw.u.ptr as *mut q::JSModuleDef };
+        unsafe { free_value(ctx, value_raw) };
+        module
+    }
+}
+
 type WrappedCallback = dyn Fn(c_int, *mut q::JSValue) -> q::JSValue;
 
 /// Taken from: https://s3.amazonaws.com/temp.michaelfbryan.com/callbacks/index.html
@@ -450,6 +509,8 @@ pub struct ContextWrapper {
     /// the closure.
     // A Mutex is used over a RefCell because it needs to be unwind-safe.
     callbacks: Mutex<Vec<(Box<WrappedCallback>, Box<q::JSValue>)>>,
+    #[allow(dead_code)]
+    module_loader: Option<Box<ModuleLoader>>,
 }
 
 impl Drop for ContextWrapper {
@@ -463,7 +524,10 @@ impl Drop for ContextWrapper {
 
 impl ContextWrapper {
     /// Initialize a wrapper by creating a JSRuntime and JSContext.
-    pub fn new(memory_limit: Option<usize>) -> Result<Self, ContextError> {
+    pub fn new(
+        memory_limit: Option<usize>,
+        mut loader: Option<Box<ModuleLoader>>,
+    ) -> Result<Self, ContextError> {
         let runtime = unsafe { q::JS_NewRuntime() };
         if runtime.is_null() {
             return Err(ContextError::RuntimeCreationFailed);
@@ -481,10 +545,22 @@ impl ContextWrapper {
             return Err(ContextError::ContextCreationFailed);
         }
 
+        if let Some(load) = loader.as_mut() {
+            unsafe {
+                q::JS_SetModuleLoaderFunc(
+                    runtime,
+                    None,
+                    Some(module_loader),
+                    load.as_mut() as *mut ModuleLoader as *mut c_void,
+                );
+            }
+        }
+
         Ok(Self {
             runtime,
             context,
             callbacks: Mutex::new(Vec::new()),
+            module_loader: loader,
         })
     }
 
@@ -552,7 +628,11 @@ impl ContextWrapper {
     }
 
     /// Evaluate javascript code.
-    pub fn eval<'a>(&'a self, code: &str) -> Result<OwnedValueRef<'a>, ExecutionError> {
+    pub fn eval_internal<'a>(
+        &'a self,
+        mode: i32,
+        code: &str,
+    ) -> Result<OwnedValueRef<'a>, ExecutionError> {
         let filename = "script.js";
         let filename_c = make_cstring(filename)?;
         let code_c = make_cstring(code)?;
@@ -563,7 +643,7 @@ impl ContextWrapper {
                 code_c.as_ptr(),
                 code.len(),
                 filename_c.as_ptr(),
-                q::JS_EVAL_TYPE_GLOBAL as i32,
+                mode,
             )
         };
         let value = OwnedValueRef::new(self, value_raw);
@@ -576,6 +656,14 @@ impl ContextWrapper {
         } else {
             Ok(value)
         }
+    }
+
+    pub fn eval<'a>(&'a self, code: &str) -> Result<OwnedValueRef<'a>, ExecutionError> {
+        self.eval_internal(q::JS_EVAL_TYPE_GLOBAL as i32, code)
+    }
+
+    pub fn eval_module<'a>(&'a self, code: &str) -> Result<OwnedValueRef<'a>, ExecutionError> {
+        self.eval_internal(q::JS_EVAL_TYPE_MODULE as i32, code)
     }
 
     /// Call a JS function with the given arguments.
