@@ -141,6 +141,11 @@ impl ContextBuilder {
 
 /// Context is a wrapper around a QuickJS Javascript context.
 /// It is the primary way to interact with the runtime.
+///
+/// For each `Context` instance a new instance of QuickJS
+/// runtime is created. It means that it is safe to use
+/// different contexts in different threads, but each
+/// `Context` instance shuld be used only from a single thread.
 pub struct Context {
     wrapper: bindings::ContextWrapper,
 }
