@@ -19,6 +19,9 @@ fn main() {
     #[cfg(not(feature = "bindgen"))]
     panic!("Invalid configuration for libquickjs-sys: Must either enable the bundled or the bindgen feature");
 
+    #[cfg(feature = "patched")]
+    panic!("Invalid configuration for libquickjs-sys: the patched feature is incompatible with the system feature");
+
     let lib = if cfg!(unix) {
         if exists("/usr/lib/quickjs/libquickjs.a") {
             "/usr/lib/quickjs"
@@ -58,6 +61,9 @@ fn main() {
     }
     copy_dir::copy_dir("./embed/quickjs", &code_dir).expect("Could not copy quickjs directory");
 
+    #[cfg(feature = "patched")]
+    apply_patches(&code_dir);
+
     eprintln!("Compiling quickjs...");
     std::process::Command::new("make")
         .arg("libquickjs.a")
@@ -76,4 +82,27 @@ fn main() {
         code_dir.to_str().unwrap()
     );
     println!("cargo:rustc-link-lib=static=quickjs");
+}
+
+#[cfg(feature = "patched")]
+fn apply_patches(code_dir: &PathBuf) {
+    use std::fs;
+
+    eprintln!("Applying patches...");
+    for patch in fs::read_dir("./embed/patches").expect("Could not open patches directory") {
+        let patch = patch.expect("Could not open patch");
+        eprintln!("Applying {:?}...", patch.file_name());
+        let status = std::process::Command::new("patch")
+            .current_dir(&code_dir)
+            .arg("-i")
+            .arg(fs::canonicalize(patch.path()).expect("Cannot canonicalize patch path"))
+            .spawn()
+            .expect("Could not apply patches")
+            .wait()
+            .expect("Could not apply patches");
+        assert!(
+            status.success(),
+            "Patch command returned non-zero exit code"
+        );
+    }
 }

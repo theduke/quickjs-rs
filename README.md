@@ -55,6 +55,12 @@ If you would like to use a system version instead, see below.
 
 QuickJS will always be statically linked to your binary.
 
+### Features
+
+The crate supports the following features:
+
+* `patched` applies QuickJS patches that can be found in `libquickjs-sys/embed/patches` directory.
+
 ### System installation
 
 To use the system installation, without the bundled feature, first install the required 
