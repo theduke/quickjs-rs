@@ -1,20 +1,36 @@
 version: 2.0
+
+shared: &shared
+  docker:
+    - image: debian
+  steps:
+    - checkout
+    - run:
+        name: Setup, Build & Test
+        command: |
+          export PATH="$HOME/.cargo/bin:$HOME:$PATH"
+
+          apt-get update && apt-get install -y curl
+
+          echo "Installing Rust..."
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          echo "Installing just..."
+          curl -LSfs https://japaric.github.io/trust/install.sh | sh -s -- --git casey/just --target x86_64-unknown-linux-musl --to $HOME
+          hash -r
+          just FEATURES="$FEATURES" ci-debian
+
 jobs:
+  default:
+    environment:
+      FEATURES: ''
+    <<: *shared
+  patched:
+    environment:
+      FEATURES: 'patched'
+    <<: *shared
+
+workflows:
+  version: 2
   build:
-    docker:
-      - image: debian
-    steps:
-      - checkout
-      - run:
-          name: Setup, Build & Test
-          command: |
-            export PATH="$HOME/.cargo/bin:$HOME:$PATH"
-
-            apt-get update && apt-get install -y curl
-
-            echo "Installing Rust..."
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-            echo "Installing just..."
-            curl -LSfs https://japaric.github.io/trust/install.sh | sh -s -- --git casey/just --target x86_64-unknown-linux-musl --to $HOME
-            hash -r
-            just ci-debian
+    - default
+    - patched
