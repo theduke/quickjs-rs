@@ -242,7 +242,6 @@ fn deserialize_value(
 ) -> Result<JsValue, ValueError> {
     let r = value;
 
-    dbg!(&r.tag);
     match r.tag {
         // Int.
         TAG_INT => {
@@ -369,6 +368,22 @@ impl<'a> Drop for OwnedValueRef<'a> {
     }
 }
 
+impl<'a> std::fmt::Debug for OwnedValueRef<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self.value.tag {
+            TAG_EXCEPTION => write!(f, "Exception(?)"),
+            TAG_NULL => write!(f, "NULL"),
+            TAG_UNDEFINED => write!(f, "UNDEFINED"),
+            TAG_BOOL => write!(f, "Bool(?)",),
+            TAG_INT => write!(f, "Int(?)"),
+            TAG_FLOAT64 => write!(f, "Float(?)"),
+            TAG_STRING => write!(f, "String(?)"),
+            TAG_OBJECT => write!(f, "Object(?)"),
+            _ => write!(f, "?"),
+        }
+    }
+}
+
 impl<'a> OwnedValueRef<'a> {
     pub fn new(context: &'a ContextWrapper, value: q::JSValue) -> Self {
         Self { context, value }
@@ -388,6 +403,10 @@ impl<'a> OwnedValueRef<'a> {
 
     pub fn is_null(&self) -> bool {
         self.value.tag == TAG_NULL
+    }
+
+    pub fn is_bool(&self) -> bool {
+        self.value.tag == TAG_BOOL
     }
 
     pub fn is_exception(&self) -> bool {
@@ -423,6 +442,13 @@ impl<'a> OwnedValueRef<'a> {
     pub fn to_value(&self) -> Result<JsValue, ValueError> {
         self.context.to_value(&self.value)
     }
+
+    pub fn to_bool(&self) -> Result<bool, ValueError> {
+        match self.to_value()? {
+            JsValue::Bool(b) => Ok(b),
+            _ => Err(ValueError::UnexpectedType),
+        }
+    }
 }
 
 /// Wraps an object from the quickjs runtime.
@@ -440,7 +466,34 @@ impl<'a> OwnedObjectRef<'a> {
         }
     }
 
-    pub fn property(&'a self, name: &str) -> Result<OwnedValueRef<'a>, ExecutionError> {
+    fn into_value(self) -> OwnedValueRef<'a> {
+        self.value
+    }
+
+    /// Get the tag of a property.
+    fn property_tag(&self, name: &str) -> Result<i64, ValueError> {
+        let cname = make_cstring(name)?;
+        let raw = unsafe {
+            q::JS_GetPropertyStr(self.value.context.context, self.value.value, cname.as_ptr())
+        };
+        let t = raw.tag;
+        unsafe {
+            free_value(self.value.context.context, raw);
+        }
+        Ok(t)
+    }
+
+    /// Determine if the object is a promise by checking the presence of
+    /// a 'then' and a 'catch' property.
+    fn is_promise(&self) -> Result<bool, ValueError> {
+        if self.property_tag("then")? == TAG_OBJECT && self.property_tag("catch")? == TAG_OBJECT {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    pub fn property(&self, name: &str) -> Result<OwnedValueRef<'a>, ExecutionError> {
         let cname = make_cstring(name)?;
         let raw = unsafe {
             q::JS_GetPropertyStr(self.value.context.context, self.value.value, cname.as_ptr())
@@ -524,11 +577,15 @@ impl ContextWrapper {
             return Err(ContextError::ContextCreationFailed);
         }
 
-        Ok(Self {
+        // Initialize the promise resolver helper code.
+        // This code is needed by Self::resolve_value
+        let wrapper = Self {
             runtime,
             context,
             callbacks: Mutex::new(Vec::new()),
-        })
+        };
+
+        Ok(wrapper)
     }
 
     /// Reset the wrapper by creating a new context.
@@ -591,6 +648,85 @@ impl ContextWrapper {
         }
     }
 
+    /// If the given value is a promise, run the event loop until it is
+    /// resolved, and return the final value.
+    fn resolve_value<'a>(
+        &'a self,
+        value: OwnedValueRef<'a>,
+    ) -> Result<OwnedValueRef<'a>, ExecutionError> {
+        if value.is_exception() {
+            let err = self
+                .get_exception()
+                .unwrap_or_else(|| ExecutionError::Exception("Unknown exception".into()));
+            Err(err)
+        } else if value.is_object() {
+            let obj = OwnedObjectRef::new(value)?;
+            if obj.is_promise()? {
+                self.eval(
+                    r#"
+                    // Values:
+                    //   - undefined: promise not finished
+                    //   - false: error ocurred, __promiseError is set.
+                    //   - true: finished, __promiseSuccess is set.
+                    var __promiseResult = 0;
+                    var __promiseValue = 0;
+
+                    var __resolvePromise = function(p) {
+                        p
+                            .then(value => {
+                                __promiseResult = true;
+                                __promiseValue = value;
+                            })
+                            .catch(e => {
+                                __promiseResult = false;
+                                __promiseValue = e;
+                            });
+                    }
+                "#,
+                )?;
+
+                let global = self.global()?;
+                let resolver = global.property("__resolvePromise")?;
+
+                // Call the resolver code that sets the result values once
+                // the promise resolves.
+                self.call_function(resolver, vec![obj.into_value()])?;
+
+                loop {
+                    let flag = unsafe {
+                        let wrapper_mut = self as *const Self as *mut Self;
+                        let ctx_mut = &mut (*wrapper_mut).context;
+                        q::JS_ExecutePendingJob(self.runtime, ctx_mut)
+                    };
+                    if flag < 0 {
+                        let e = self.get_exception().unwrap_or_else(|| {
+                            ExecutionError::Exception("Unknown exception".into())
+                        });
+                        return Err(e);
+                    }
+
+                    // Check if promise is finished.
+                    let res_val = global.property("__promiseResult")?;
+                    if res_val.is_bool() {
+                        let ok = res_val.to_bool()?;
+                        let value = global.property("__promiseValue")?;
+
+                        if ok {
+                            return self.resolve_value(value);
+                        } else {
+                            let err_msg = value.to_string()?;
+                            return Err(ExecutionError::Exception(JsValue::String(err_msg)));
+                        }
+                    }
+                }
+            } else {
+                Ok(obj.into_value())
+            }
+        } else {
+            Ok(value)
+        }
+    }
+
     /// Evaluate javascript code.
     pub fn eval<'a>(&'a self, code: &str) -> Result<OwnedValueRef<'a>, ExecutionError> {
         let filename = "script.js";
@@ -607,15 +743,7 @@ impl ContextWrapper {
             )
         };
         let value = OwnedValueRef::new(self, value_raw);
-
-        if value.is_exception() {
-            let err = self
-                .get_exception()
-                .unwrap_or_else(|| ExecutionError::Exception("Unknown exception".into()));
-            Err(err)
-        } else {
-            Ok(value)
-        }
+        self.resolve_value(value)
     }
 
     /// Call a JS function with the given arguments.
@@ -641,15 +769,7 @@ impl ContextWrapper {
             )
         };
         let qres = OwnedValueRef::new(self, qres_raw);
-
-        if qres.is_exception() {
-            let err = self
-                .get_exception()
-                .unwrap_or_else(|| ExecutionError::Exception("Unknown exception".into()));
-            Err(err)
-        } else {
-            Ok(qres)
-        }
+        self.resolve_value(qres)
     }
 
     /// Helper for executing a callback closure.

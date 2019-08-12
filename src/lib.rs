@@ -183,6 +183,12 @@ impl Context {
 
     /// Evaluates Javascript code and returns the value of the final expression.
     ///
+    /// **Promises**:
+    /// If the evaluated code returns a Promise, the event loop
+    /// will be executed until the promise is finished. The final value of
+    /// the promise will be returned, or a `ExecutionError::Exception` if the
+    /// promise failed.
+    ///
     /// ```rust
     /// use quick_js::{Context, JsValue};
     /// let context = Context::new().unwrap();
@@ -213,6 +219,12 @@ impl Context {
     /// Evaluates Javascript code and returns the value of the final expression
     /// as a Rust type.
     ///
+    /// **Promises**:
+    /// If the evaluated code returns a Promise, the event loop
+    /// will be executed until the promise is finished. The final value of
+    /// the promise will be returned, or a `ExecutionError::Exception` if the
+    /// promise failed.
+    ///
     /// ```rust
     /// use quick_js::{Context};
     /// let context = Context::new().unwrap();
@@ -241,6 +253,12 @@ impl Context {
     }
 
     /// Call a global function in the Javascript namespace.
+    ///
+    /// **Promises**:
+    /// If the evaluated code returns a Promise, the event loop
+    /// will be executed until the promise is finished. The final value of
+    /// the promise will be returned, or a `ExecutionError::Exception` if the
+    /// promise failed.
     ///
     /// ```rust
     /// use quick_js::{Context, JsValue};
@@ -432,6 +450,36 @@ mod tests {
     }
 
     #[test]
+    fn eval_async() {
+        let c = Context::new().unwrap();
+
+        let value = c
+            .eval(
+                r#"
+            new Promise((resolve, _) => {
+                resolve(33);
+            })
+       "#,
+            )
+            .unwrap();
+        assert_eq!(value, JsValue::Int(33));
+
+        let res = c.eval(
+            r#"
+            new Promise((_resolve, reject) => {
+                reject("Failed...");
+            })
+       "#,
+        );
+        assert_eq!(
+            res,
+            Err(ExecutionError::Exception(JsValue::String(
+                "Failed...".into()
+            )))
+        );
+    }
+
+    #[test]
     fn test_call() {
         let c = Context::new().unwrap();
 
@@ -500,6 +548,39 @@ mod tests {
         let s = " ".repeat(200_000);
         let v = c.call_function("strLen", vec![s]).unwrap();
         assert_eq!(v, JsValue::Int(200_000));
+    }
+
+    #[test]
+    fn call_async() {
+        let c = Context::new().unwrap();
+
+        c.eval(
+            r#"
+            function asyncOk() {
+                return new Promise((resolve, _) => {
+                    resolve(33);
+                });
+            }
+
+            function asyncErr() {
+                return new Promise((_resolve, reject) => {
+                    reject("Failed...");
+                });
+            }
+        "#,
+        )
+        .unwrap();
+
+        let value = c.call_function("asyncOk", vec![true]).unwrap();
+        assert_eq!(value, JsValue::Int(33));
+
+        let res = c.call_function("asyncErr", vec![true]);
+        assert_eq!(
+            res,
+            Err(ExecutionError::Exception(JsValue::String(
+                "Failed...".into()
+            )))
+        );
     }
 
     #[test]
