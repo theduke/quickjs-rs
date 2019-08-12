@@ -1,8 +1,8 @@
 use std::{
+    collections::HashMap,
     ffi::CString,
     os::raw::{c_int, c_void},
     sync::Mutex,
-    collections::HashMap,
 };
 
 use libquickjs_sys as q;
@@ -59,13 +59,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
             tag: TAG_FLOAT64,
         },
         JsValue::String(val) => {
-            let qval = unsafe {
-                q::JS_NewStringLen(
-                    context,
-                    val.as_ptr() as *const i8,
-                    val.len(),
-                )
-            };
+            let qval = unsafe { q::JS_NewStringLen(context, val.as_ptr() as *const i8, val.len()) };
 
             if qval.tag == TAG_EXCEPTION {
                 return Err(ValueError::Internal(
@@ -154,16 +148,17 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
     Ok(v)
 }
 
-fn deserialize_array(context: *mut q::JSContext, raw_value: &q::JSValue) -> Result<JsValue, ValueError> {
+fn deserialize_array(
+    context: *mut q::JSContext,
+    raw_value: &q::JSValue,
+) -> Result<JsValue, ValueError> {
     assert_eq!(raw_value.tag, TAG_OBJECT);
 
     let length_name = make_cstring("length")?;
 
-    let len_raw = unsafe {
-        q::JS_GetPropertyStr(context, *raw_value, length_name.as_ptr())
-    };
+    let len_raw = unsafe { q::JS_GetPropertyStr(context, *raw_value, length_name.as_ptr()) };
 
-    let len_res = deserialize_value(context, &len_raw); 
+    let len_res = deserialize_value(context, &len_raw);
     unsafe { free_value(context, len_raw) };
     let len = match len_res? {
         JsValue::Int(x) => x,
@@ -180,7 +175,7 @@ fn deserialize_array(context: *mut q::JSContext, raw_value: &q::JSValue) -> Resu
         if value_raw.tag == TAG_EXCEPTION {
             return Err(ValueError::Internal("Could not build array".into()));
         }
-        let value_res = deserialize_value(context, &value_raw); 
+        let value_res = deserialize_value(context, &value_raw);
         unsafe { free_value(context, value_raw) };
 
         let value = value_res?;
@@ -193,52 +188,43 @@ fn deserialize_array(context: *mut q::JSContext, raw_value: &q::JSValue) -> Resu
 fn deserialize_object(context: *mut q::JSContext, obj: &q::JSValue) -> Result<JsValue, ValueError> {
     assert_eq!(obj.tag, TAG_OBJECT);
 
-    let mut properties: *mut q::JSPropertyEnum  = std::ptr::null_mut();
+    let mut properties: *mut q::JSPropertyEnum = std::ptr::null_mut();
     let mut count: u32 = 0;
 
     let flags = (q::JS_GPN_STRING_MASK | q::JS_GPN_SYMBOL_MASK | q::JS_GPN_ENUM_ONLY) as i32;
-    let ret = unsafe {
-        q::JS_GetOwnPropertyNames(
-            context, 
-            &mut properties, 
-            &mut count,
-            *obj,
-           flags,
-       )
-    };
+    let ret =
+        unsafe { q::JS_GetOwnPropertyNames(context, &mut properties, &mut count, *obj, flags) };
     if ret != 0 {
-        return Err(ValueError::Internal("Could not get object properties".into()));
+        return Err(ValueError::Internal(
+            "Could not get object properties".into(),
+        ));
     }
 
     let mut map = HashMap::new();
     for index in 0..count {
         let prop = unsafe { properties.offset(index as isize) };
-        let raw_value = unsafe {
-            q::JS_GetPropertyInternal(
-                context,
-                *obj,
-                (*prop).atom,
-                *obj,
-                0,
-            )
-        };
+        let raw_value = unsafe { q::JS_GetPropertyInternal(context, *obj, (*prop).atom, *obj, 0) };
         if raw_value.tag == TAG_EXCEPTION {
             return Err(ValueError::Internal("Could not get object property".into()));
         }
 
-        let value_res = deserialize_value(context, &raw_value); 
-        unsafe { free_value(context, raw_value); }
+        let value_res = deserialize_value(context, &raw_value);
+        unsafe {
+            free_value(context, raw_value);
+        }
         let value = value_res?;
 
-        let key_value = unsafe {
-            q::JS_AtomToString(context, (*prop).atom)
-        };
+        let key_value = unsafe { q::JS_AtomToString(context, (*prop).atom) };
         if key_value.tag == TAG_EXCEPTION {
-            return Err(ValueError::Internal("Could not get object property name".into()));
+            return Err(ValueError::Internal(
+                "Could not get object property name".into(),
+            ));
         }
 
         let key_res = deserialize_value(context, &key_value);
-        unsafe { free_value(context, key_value); }
+        unsafe {
+            free_value(context, key_value);
+        }
         let key = match key_res? {
             JsValue::String(s) => s,
             _ => {
@@ -280,8 +266,9 @@ fn deserialize_value(
         }
         // String.
         TAG_STRING => {
-            let ptr =
-                unsafe { q::JS_ToCStringLen2(context, std::ptr::null::<usize>() as *mut usize, *r, 0) };
+            let ptr = unsafe {
+                q::JS_ToCStringLen2(context, std::ptr::null::<usize>() as *mut usize, *r, 0)
+            };
 
             if ptr.is_null() {
                 return Err(ValueError::Internal(

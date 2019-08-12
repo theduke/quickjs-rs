@@ -334,7 +334,7 @@ mod tests {
     //         JsValue::Bool(true),
     //     );
     // }
-    
+
     #[test]
     fn test_eval_pass() {
         use std::iter::FromIterator;
@@ -361,26 +361,35 @@ mod tests {
         }
 
         let obj_cases = vec![
-            (r#" {"a": null} "#, Ok(JsValue::Object(HashMap::from_iter(
-                vec![
-                    ("a".to_string(), JsValue::Null),
-                ],
-            )))),
-            (r#" {a: 1, b: true, c: {c1: false}} "#, Ok(JsValue::Object(HashMap::from_iter(
-                vec![
+            (
+                r#" {"a": null} "#,
+                Ok(JsValue::Object(HashMap::from_iter(vec![(
+                    "a".to_string(),
+                    JsValue::Null,
+                )]))),
+            ),
+            (
+                r#" {a: 1, b: true, c: {c1: false}} "#,
+                Ok(JsValue::Object(HashMap::from_iter(vec![
                     ("a".to_string(), JsValue::Int(1)),
                     ("b".to_string(), JsValue::Bool(true)),
-                    ("c".to_string(), JsValue::Object(HashMap::from_iter(
-                        vec![
-                            ("c1".to_string(), JsValue::Bool(false)),
-                        ]
-                    ))),
-                ],
-            )))),
+                    (
+                        "c".to_string(),
+                        JsValue::Object(HashMap::from_iter(vec![(
+                            "c1".to_string(),
+                            JsValue::Bool(false),
+                        )])),
+                    ),
+                ]))),
+            ),
         ];
 
         for (index, (code, res)) in obj_cases.into_iter().enumerate() {
-            let full_code = format!("var v{index} = {code}; v{index}", index=index, code=code); 
+            let full_code = format!(
+                "var v{index} = {code}; v{index}",
+                index = index,
+                code = code
+            );
             assert_eq!(c.eval(&full_code), res,);
         }
 
