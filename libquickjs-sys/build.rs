@@ -59,7 +59,11 @@ fn main() {
     if exists(&code_dir) {
         std::fs::remove_dir_all(&code_dir).unwrap();
     }
-    copy_dir::copy_dir("./embed/quickjs", &code_dir).expect("Could not copy quickjs directory");
+    let crate_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    let embed_dir = crate_dir.join("embed");
+    let quickjs_dir = embed_dir.join("quickjs");
+
+    copy_dir::copy_dir(quickjs_dir, &code_dir).expect("Could not copy quickjs directory");
 
     #[cfg(feature = "patched")]
     apply_patches(&code_dir);
@@ -73,15 +77,23 @@ fn main() {
         .wait()
         .expect("Could not compile quickjs");
 
-    std::fs::copy("./embed/bindings.rs", out_path.join("bindings.rs"))
-        .expect("Could not copy bindings.rs");
+    let bindings_rs = embed_dir.join("bindings.rs");
+    std::fs::copy(bindings_rs, out_path.join("bindings.rs")).expect("Could not copy bindings.rs");
+
+    if cfg!(windows) {
+        for res in std::fs::read_dir(&code_dir).unwrap() {
+            eprintln!("{}", res.unwrap().path().display());
+        }
+        std::fs::copy(
+            code_dir.join("libquickjs.a"),
+            code_dir.join("libquickjs.lib"),
+        )
+        .expect("Could not move static library");
+    }
 
     // Instruct cargo to statically link quickjs.
-    println!(
-        "cargo:rustc-link-search=native={}",
-        code_dir.to_str().unwrap()
-    );
     println!("cargo:rustc-link-lib=static=quickjs");
+    println!("cargo:rustc-link-search=native={}", code_dir.display(),);
 }
 
 #[cfg(feature = "patched")]

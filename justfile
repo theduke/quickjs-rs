@@ -43,3 +43,9 @@ ci-macos-setup:
     echo "setup"
 
 ci-macos: ci-macos-setup ci-test
+
+ci-windows-setup:
+    echo "setup"
+
+ci-windows: ci-windows-setup ci-test
+
