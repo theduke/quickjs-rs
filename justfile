@@ -1,6 +1,6 @@
 embed_dir := "./libquickjs-sys/embed/quickjs"
 
-DOWNLOAD_URL := "https://bellard.org/quickjs/quickjs-2019-07-28.tar.xz"
+DOWNLOAD_URL := "https://bellard.org/quickjs/quickjs-2019-08-10.tar.xz"
 
 download-new:
     test -d {{embed_dir}} && rm -r {{embed_dir}} || echo ""

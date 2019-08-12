@@ -142,6 +142,11 @@ pub const JS_EVAL_TYPE_MASK: u32 = 3;
 pub const JS_EVAL_FLAG_STRICT: u32 = 8;
 pub const JS_EVAL_FLAG_STRIP: u32 = 16;
 pub const JS_EVAL_FLAG_COMPILE_ONLY: u32 = 32;
+pub const JS_GPN_STRING_MASK: u32 = 1;
+pub const JS_GPN_SYMBOL_MASK: u32 = 2;
+pub const JS_GPN_PRIVATE_MASK: u32 = 4;
+pub const JS_GPN_ENUM_ONLY: u32 = 16;
+pub const JS_GPN_SET_ENUM: u32 = 32;
 pub const JS_EVAL_BINARY_LOAD_ONLY: u32 = 1;
 pub const JS_WRITE_OBJ_BYTECODE: u32 = 1;
 pub const JS_WRITE_OBJ_BSWAP: u32 = 2;
@@ -2040,7 +2045,7 @@ extern "C" {
     pub fn JS_NewAtomLen(
         ctx: *mut JSContext,
         str: *const ::std::os::raw::c_char,
-        len: ::std::os::raw::c_int,
+        len: usize,
     ) -> JSAtom;
 }
 extern "C" {
@@ -2432,6 +2437,12 @@ extern "C" {
     pub fn JS_NewInt64(ctx: *mut JSContext, v: i64) -> JSValue;
 }
 extern "C" {
+    pub fn JS_NewBigInt64(ctx: *mut JSContext, v: i64) -> JSValue;
+}
+extern "C" {
+    pub fn JS_NewBigUint64(ctx: *mut JSContext, v: u64) -> JSValue;
+}
+extern "C" {
     pub fn JS_IsNumber(v: JSValue) -> ::std::os::raw::c_int;
 }
 extern "C" {
@@ -2513,10 +2524,17 @@ extern "C" {
         -> ::std::os::raw::c_int;
 }
 extern "C" {
+    pub fn JS_ToBigInt64(
+        ctx: *mut JSContext,
+        pres: *mut i64,
+        val: JSValue,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
     pub fn JS_NewStringLen(
         ctx: *mut JSContext,
         str1: *const ::std::os::raw::c_char,
-        len1: ::std::os::raw::c_int,
+        len1: usize,
     ) -> JSValue;
 }
 extern "C" {
@@ -2532,9 +2550,9 @@ extern "C" {
     pub fn JS_ToPropertyKey(ctx: *mut JSContext, val: JSValue) -> JSValue;
 }
 extern "C" {
-    pub fn JS_ToCStringLen(
+    pub fn JS_ToCStringLen2(
         ctx: *mut JSContext,
-        plen: *mut ::std::os::raw::c_int,
+        plen: *mut usize,
         val1: JSValue,
         cesu8: ::std::os::raw::c_int,
     ) -> *const ::std::os::raw::c_char;
@@ -2652,6 +2670,23 @@ extern "C" {
 }
 extern "C" {
     pub fn JS_GetPrototype(ctx: *mut JSContext, val: JSValue) -> JSValue;
+}
+extern "C" {
+    pub fn JS_GetOwnPropertyNames(
+        ctx: *mut JSContext,
+        ptab: *mut *mut JSPropertyEnum,
+        plen: *mut u32,
+        obj: JSValue,
+        flags: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn JS_GetOwnProperty(
+        ctx: *mut JSContext,
+        desc: *mut JSPropertyDescriptor,
+        obj: JSValue,
+        prop: JSAtom,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn JS_ParseJSON(
