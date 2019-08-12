@@ -11,6 +11,10 @@ pub enum JsValue {
     String(String),
     Array(Vec<JsValue>),
     Object(HashMap<String, JsValue>),
+    /// chrono::Datetime<Utc> / JS Date integration.
+    /// Only available with the optional `chrono` feature.
+    #[cfg(feature = "chrono")]
+    Date(chrono::DateTime<chrono::Utc>),
 }
 
 impl JsValue {

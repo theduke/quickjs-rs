@@ -37,6 +37,25 @@ unsafe fn free_value(context: *mut q::JSContext, value: q::JSValue) {
     }
 }
 
+#[cfg(feature = "chrono")]
+fn js_date_constructor(context: *mut q::JSContext) -> q::JSValue {
+    let global = unsafe { q::JS_GetGlobalObject(context) };
+    assert_eq!(global.tag, TAG_OBJECT);
+
+    let date_constructor = unsafe {
+        q::JS_GetPropertyStr(
+            context,
+            global,
+            std::ffi::CStr::from_bytes_with_nul(b"Date\0")
+                .unwrap()
+                .as_ptr(),
+        )
+    };
+    assert_eq!(date_constructor.tag, TAG_OBJECT);
+    unsafe { free_value(context, global) };
+    date_constructor
+}
+
 /// Serialize a Rust value into a quickjs runtime value.
 fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSValue, ValueError> {
     let v = match value {
@@ -143,6 +162,38 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
             }
 
             obj
+        }
+        #[cfg(feature = "chrono")]
+        JsValue::Date(datetime) => {
+            let date_constructor = js_date_constructor(context);
+
+            let timestamp = q::JSValue {
+                u: q::JSValueUnion {
+                    float64: datetime.timestamp_millis() as f64,
+                },
+                tag: TAG_FLOAT64,
+            };
+
+            let mut args = vec![timestamp];
+
+            let value = unsafe {
+                q::JS_CallConstructor(
+                    context,
+                    date_constructor,
+                    args.len() as i32,
+                    args.as_mut_ptr(),
+                )
+            };
+            unsafe {
+                free_value(context, date_constructor);
+            }
+
+            if value.tag != TAG_OBJECT {
+                return Err(ValueError::Internal(
+                    "Could not construct Date object".into(),
+                ));
+            }
+            value
         }
     };
     Ok(v)
@@ -293,6 +344,50 @@ fn deserialize_value(
             if is_array {
                 deserialize_array(context, r)
             } else {
+                #[cfg(feature = "chrono")]
+                {
+                    use chrono::offset::TimeZone;
+
+                    let date_constructor = js_date_constructor(context);
+                    let is_date = unsafe { q::JS_IsInstanceOf(context, *r, date_constructor) > 0 };
+
+                    if is_date {
+                        let getter = unsafe {
+                            q::JS_GetPropertyStr(
+                                context,
+                                *r,
+                                std::ffi::CStr::from_bytes_with_nul(b"getTime\0")
+                                    .unwrap()
+                                    .as_ptr(),
+                            )
+                        };
+                        assert_eq!(getter.tag, TAG_OBJECT);
+
+                        let timestamp_raw =
+                            unsafe { q::JS_Call(context, getter, *r, 0, std::ptr::null_mut()) };
+                        unsafe {
+                            free_value(context, getter);
+                            free_value(context, date_constructor);
+                        };
+
+                        let res = if timestamp_raw.tag != TAG_FLOAT64 {
+                            Err(ValueError::Internal(
+                                "Could not convert 'Date' instance to timestamp".into(),
+                            ))
+                        } else {
+                            let millis = unsafe { timestamp_raw.u.float64 } as i64;
+                            let secs = millis / 1000;
+                            let nanos = (millis % 1000 * 1000) as u32;
+
+                            let datetime = chrono::Utc.timestamp(secs, nanos);
+                            Ok(JsValue::Date(datetime))
+                        };
+                        return res;
+                    } else {
+                        unsafe { free_value(context, date_constructor) };
+                    }
+                }
+
                 deserialize_object(context, r)
             }
         }
@@ -745,6 +840,35 @@ impl ContextWrapper {
         let value = OwnedValueRef::new(self, value_raw);
         self.resolve_value(value)
     }
+
+    /*
+    /// Call a constructor function.
+    fn call_constructor<'a>(
+        &'a self,
+        function: OwnedValueRef<'a>,
+        args: Vec<OwnedValueRef<'a>>,
+    ) -> Result<OwnedValueRef<'a>, ExecutionError> {
+        let mut qargs = args.iter().map(|arg| arg.value).collect::<Vec<_>>();
+
+        let value_raw = unsafe {
+            q::JS_CallConstructor(
+                self.context,
+                function.value,
+                qargs.len() as i32,
+                qargs.as_mut_ptr(),
+            )
+        };
+        let value = OwnedValueRef::new(self, value_raw);
+        if value.is_exception() {
+            let err = self
+                .get_exception()
+                .unwrap_or_else(|| ExecutionError::Exception("Unknown exception".into()));
+            Err(err)
+        } else {
+            Ok(value)
+        }
+    }
+    */
 
     /// Call a JS function with the given arguments.
     pub fn call_function<'a>(

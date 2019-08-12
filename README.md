@@ -59,7 +59,9 @@ QuickJS will always be statically linked to your binary.
 
 The crate supports the following features:
 
-* `patched` applies QuickJS patches that can be found in `libquickjs-sys/embed/patches` directory.
+* `chrono`: adds chrono integration
+    - adds a `JsValue::Date` variant that can be (de)serialized to/from a JS `Date`
+* `patched`: applies QuickJS patches that can be found in `libquickjs-sys/embed/patches` directory.
 
 ### System installation
 

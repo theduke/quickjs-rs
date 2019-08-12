@@ -719,4 +719,41 @@ mod tests {
         let v = c.eval(" f('la') ").unwrap();
         assert_eq!(v, "lala".into());
     }
+
+    #[cfg(feature = "chrono")]
+    #[test]
+    fn chrono_serialize() {
+        let c = build_context();
+
+        c.eval(
+            "
+            function dateToTimestamp(date) {
+                return date.getTime();
+            }
+       ",
+        )
+        .unwrap();
+
+        let now = chrono::Utc::now();
+        let now_millis = now.timestamp_millis();
+
+        let timestamp = c
+            .call_function("dateToTimestamp", vec![JsValue::Date(now.clone())])
+            .unwrap();
+
+        assert_eq!(timestamp, JsValue::Float(now_millis as f64));
+    }
+
+    #[cfg(feature = "chrono")]
+    #[test]
+    fn chrono_deserialize() {
+        use chrono::offset::TimeZone;
+
+        let c = build_context();
+
+        let value = c.eval(" new Date(1234567555) ").unwrap();
+        let datetime = chrono::Utc.timestamp(1234567, 555 * 1000);
+
+        assert_eq!(value, JsValue::Date(datetime));
+    }
 }
