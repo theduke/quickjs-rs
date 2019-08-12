@@ -17,3 +17,6 @@ libquickjs-sys = { version = "0.3.0", path = "./libquickjs-sys" }
 members = [
     "libquickjs-sys",
 ]
+
+[features]
+patched = ["libquickjs-sys/patched"]

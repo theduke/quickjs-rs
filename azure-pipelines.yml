@@ -23,6 +23,12 @@ jobs:
       
   - job: macos_stable
     displayName: Mac OS Stable
+    strategy:
+      matrix:
+        default:
+          FEATURES: ''
+        patched:
+          FEATURES: 'patched'
 
     pool:
       vmImage: 'macOS-10.14'
@@ -37,5 +43,5 @@ jobs:
           echo "Installing just..."
           curl -LSfs https://japaric.github.io/trust/install.sh | sh -s -- --git casey/just --to $HOME
           hash -r
-          just ci-macos
+          just FEATURES="$FEATURES" ci-macos
         displayName: setup and test

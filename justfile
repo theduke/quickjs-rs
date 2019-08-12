@@ -1,6 +1,7 @@
 embed_dir := "./libquickjs-sys/embed/quickjs"
 
 DOWNLOAD_URL := "https://bellard.org/quickjs/quickjs-2019-08-10.tar.xz"
+FEATURES := ""
 
 download-new:
     test -d {{embed_dir}} && rm -r {{embed_dir}} || echo ""
@@ -25,7 +26,7 @@ ci-debian-setup:
 
 ci-test:
     # Limit test threads to 1 to show test name before execution.
-    RUST_TEST_THREADS=1 cargo test --verbose
+    RUST_TEST_THREADS=1 cargo test --verbose --features="{{FEATURES}}"
 
 ci-lint:
     rustup component add rustfmt clippy

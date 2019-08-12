@@ -1,20 +1,47 @@
-version: 2.0
-jobs:
-  build:
-    docker:
-      - image: debian
+version: 2.1
+
+commands:
+  tests:
+    description: "Run tests"
+    parameters:
+      features:
+        type: string
     steps:
       - checkout
       - run:
-          name: Setup, Build & Test
+          name: Setup
           command: |
-            export PATH="$HOME/.cargo/bin:$HOME:$PATH"
-
+            echo "Installing curl..."
             apt-get update && apt-get install -y curl
-
             echo "Installing Rust..."
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
             echo "Installing just..."
             curl -LSfs https://japaric.github.io/trust/install.sh | sh -s -- --git casey/just --target x86_64-unknown-linux-musl --to $HOME
-            hash -r
-            just ci-debian
+      - run: 
+          name: Test
+          command: |
+            export PATH="$HOME/.cargo/bin:$HOME:$PATH"
+            just FEATURES="<<parameters.features>>" ci-debian
+
+
+jobs:
+  test-features-default:
+    docker:
+      - image: debian
+    steps:
+      - tests:
+          features: ""
+  test-features-patched:
+    docker:
+      - image: debian
+    steps:
+      - tests:
+          features: "patched"
+
+workflows:
+  version: 2
+  tests:
+    jobs:
+      - test-features-default
+      - test-features-patched
+
