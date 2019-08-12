@@ -26,9 +26,9 @@ jobs:
     strategy:
       matrix:
         default:
-          FEATURES: ''
+          FEATURES: 'chrono'
         patched:
-          FEATURES: 'patched'
+          FEATURES: 'patched,chrono'
 
     pool:
       vmImage: 'macOS-10.14'

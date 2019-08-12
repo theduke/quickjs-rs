@@ -30,13 +30,13 @@ jobs:
       - image: debian
     steps:
       - tests:
-          features: ""
+          features: "chrono"
   test-features-patched:
     docker:
       - image: debian
     steps:
       - tests:
-          features: "patched"
+          features: "patched,chrono"
 
 workflows:
   version: 2
