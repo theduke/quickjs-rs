@@ -5,8 +5,6 @@
 //!
 //! ## Limitations
 //!
-//!* JS objects can not be deserialized into Rust (JsValue::Object) due to a missing property enumeration API
-//!    (will be fixed soon)
 //! * Windows is not supported yet
 //!
 //! ## Quickstart:
@@ -315,6 +313,8 @@ impl Context {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
 
     // #[test]
@@ -334,9 +334,11 @@ mod tests {
     //         JsValue::Bool(true),
     //     );
     // }
-
+    
     #[test]
     fn test_eval_pass() {
+        use std::iter::FromIterator;
+
         let c = Context::new().unwrap();
 
         let cases = vec![
@@ -356,6 +358,30 @@ mod tests {
 
         for (code, res) in cases.into_iter() {
             assert_eq!(c.eval(code), res,);
+        }
+
+        let obj_cases = vec![
+            (r#" {"a": null} "#, Ok(JsValue::Object(HashMap::from_iter(
+                vec![
+                    ("a".to_string(), JsValue::Null),
+                ],
+            )))),
+            (r#" {a: 1, b: true, c: {c1: false}} "#, Ok(JsValue::Object(HashMap::from_iter(
+                vec![
+                    ("a".to_string(), JsValue::Int(1)),
+                    ("b".to_string(), JsValue::Bool(true)),
+                    ("c".to_string(), JsValue::Object(HashMap::from_iter(
+                        vec![
+                            ("c1".to_string(), JsValue::Bool(false)),
+                        ]
+                    ))),
+                ],
+            )))),
+        ];
+
+        for (index, (code, res)) in obj_cases.into_iter().enumerate() {
+            let full_code = format!("var v{index} = {code}; v{index}", index=index, code=code); 
+            assert_eq!(c.eval(&full_code), res,);
         }
 
         assert_eq!(c.eval_as::<bool>("true").unwrap(), true,);
