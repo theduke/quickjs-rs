@@ -1,6 +1,9 @@
 # libquickjs_sys - Changelog
 
-## v0.3.0 - 2019-08-12
+## v0.3.0 - 2019-08-13
+
+* Added `patched` feature for applying patches
+* Added patch stack-overflow-signed to fix stackoverflow due invalid cast
 
 * c_int changed to usize in JS_NewAtomLen/JS_NewStringLen
 * JS_ToCStringLen2 replaces JS_ToCStringLen 
