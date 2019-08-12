@@ -23,6 +23,14 @@ impl JsValue {
             _ => None,
         }
     }
+
+    /// Convert to `String`.
+    pub fn into_string(self) -> Option<String> {
+        match self {
+            JsValue::String(s) => Some(s),
+            _ => None,
+        }
+    }
 }
 
 macro_rules! value_impl_from {

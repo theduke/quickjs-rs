@@ -14,8 +14,6 @@ This crate allows you to easily run and integrate with Javascript code from Rust
 
 ## Limitations
 
-* JS objects can not be deserialized into Rust (JsValue::Object) due to a missing property enumeration API
-    (will be fixed soon)
 * Windows is not supported yet
 
 ## Usage

@@ -11,7 +11,7 @@ authors = ["Christoph Herzog <chris@theduke.at>"]
 keywords = ["quickjs", "javascript", "js", "engine", "interpreter"]
 
 [dependencies]
-libquickjs-sys = { version = "0.2.0", path = "./libquickjs-sys" }
+libquickjs-sys = { version = "0.3.0", path = "./libquickjs-sys" }
 
 [workspace]
 members = [

@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     ffi::CString,
     os::raw::{c_int, c_void},
     sync::Mutex,
@@ -58,13 +59,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
             tag: TAG_FLOAT64,
         },
         JsValue::String(val) => {
-            let qval = unsafe {
-                q::JS_NewStringLen(
-                    context,
-                    val.as_ptr() as *const i8,
-                    val.len() as std::os::raw::c_int,
-                )
-            };
+            let qval = unsafe { q::JS_NewStringLen(context, val.as_ptr() as *const i8, val.len()) };
 
             if qval.tag == TAG_EXCEPTION {
                 return Err(ValueError::Internal(
@@ -153,12 +148,101 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
     Ok(v)
 }
 
+fn deserialize_array(
+    context: *mut q::JSContext,
+    raw_value: &q::JSValue,
+) -> Result<JsValue, ValueError> {
+    assert_eq!(raw_value.tag, TAG_OBJECT);
+
+    let length_name = make_cstring("length")?;
+
+    let len_raw = unsafe { q::JS_GetPropertyStr(context, *raw_value, length_name.as_ptr()) };
+
+    let len_res = deserialize_value(context, &len_raw);
+    unsafe { free_value(context, len_raw) };
+    let len = match len_res? {
+        JsValue::Int(x) => x,
+        _ => {
+            return Err(ValueError::Internal(
+                "Could not determine array length".into(),
+            ));
+        }
+    };
+
+    let mut values = Vec::new();
+    for index in 0..(len as usize) {
+        let value_raw = unsafe { q::JS_GetPropertyUint32(context, *raw_value, index as u32) };
+        if value_raw.tag == TAG_EXCEPTION {
+            return Err(ValueError::Internal("Could not build array".into()));
+        }
+        let value_res = deserialize_value(context, &value_raw);
+        unsafe { free_value(context, value_raw) };
+
+        let value = value_res?;
+        values.push(value);
+    }
+
+    Ok(JsValue::Array(values))
+}
+
+fn deserialize_object(context: *mut q::JSContext, obj: &q::JSValue) -> Result<JsValue, ValueError> {
+    assert_eq!(obj.tag, TAG_OBJECT);
+
+    let mut properties: *mut q::JSPropertyEnum = std::ptr::null_mut();
+    let mut count: u32 = 0;
+
+    let flags = (q::JS_GPN_STRING_MASK | q::JS_GPN_SYMBOL_MASK | q::JS_GPN_ENUM_ONLY) as i32;
+    let ret =
+        unsafe { q::JS_GetOwnPropertyNames(context, &mut properties, &mut count, *obj, flags) };
+    if ret != 0 {
+        return Err(ValueError::Internal(
+            "Could not get object properties".into(),
+        ));
+    }
+
+    let mut map = HashMap::new();
+    for index in 0..count {
+        let prop = unsafe { properties.offset(index as isize) };
+        let raw_value = unsafe { q::JS_GetPropertyInternal(context, *obj, (*prop).atom, *obj, 0) };
+        if raw_value.tag == TAG_EXCEPTION {
+            return Err(ValueError::Internal("Could not get object property".into()));
+        }
+
+        let value_res = deserialize_value(context, &raw_value);
+        unsafe {
+            free_value(context, raw_value);
+        }
+        let value = value_res?;
+
+        let key_value = unsafe { q::JS_AtomToString(context, (*prop).atom) };
+        if key_value.tag == TAG_EXCEPTION {
+            return Err(ValueError::Internal(
+                "Could not get object property name".into(),
+            ));
+        }
+
+        let key_res = deserialize_value(context, &key_value);
+        unsafe {
+            free_value(context, key_value);
+        }
+        let key = match key_res? {
+            JsValue::String(s) => s,
+            _ => {
+                return Err(ValueError::Internal("Could not get property name".into()));
+            }
+        };
+        map.insert(key, value);
+    }
+    Ok(JsValue::Object(map))
+}
+
 fn deserialize_value(
     context: *mut q::JSContext,
     value: &q::JSValue,
 ) -> Result<JsValue, ValueError> {
     let r = value;
 
+    dbg!(&r.tag);
     match r.tag {
         // Int.
         TAG_INT => {
@@ -182,8 +266,9 @@ fn deserialize_value(
         }
         // String.
         TAG_STRING => {
-            let ptr =
-                unsafe { q::JS_ToCStringLen(context, std::ptr::null::<i32>() as *mut i32, *r, 0) };
+            let ptr = unsafe {
+                q::JS_ToCStringLen2(context, std::ptr::null::<usize>() as *mut usize, *r, 0)
+            };
 
             if ptr.is_null() {
                 return Err(ValueError::Internal(
@@ -207,51 +292,9 @@ fn deserialize_value(
         TAG_OBJECT => {
             let is_array = unsafe { q::JS_IsArray(context, *r) } > 0;
             if is_array {
-                let length_name = make_cstring("length")?;
-
-                let len_value = unsafe {
-                    let raw = q::JS_GetPropertyStr(context, *r, length_name.as_ptr());
-
-                    match deserialize_value(context, &raw) {
-                        Ok(v) => {
-                            free_value(context, raw);
-                            v
-                        }
-                        Err(e) => {
-                            free_value(context, raw);
-                            return Err(e);
-                        }
-                    }
-                };
-                let len = if let JsValue::Int(x) = len_value {
-                    x
-                } else {
-                    return Err(ValueError::Internal(
-                        "Could not determine array length".into(),
-                    ));
-                };
-
-                let mut values = Vec::new();
-                for index in 0..(len as usize) {
-                    let value_raw = unsafe { q::JS_GetPropertyUint32(context, *r, index as u32) };
-                    if value_raw.tag == TAG_EXCEPTION {
-                        return Err(ValueError::Internal("Could not build array".into()));
-                    }
-                    match deserialize_value(context, &value_raw) {
-                        Ok(v) => {
-                            unsafe { free_value(context, value_raw) };
-                            values.push(v)
-                        }
-                        Err(e) => {
-                            unsafe { free_value(context, value_raw) };
-                            return Err(e);
-                        }
-                    }
-                }
-
-                Ok(JsValue::Array(values))
+                deserialize_array(context, r)
             } else {
-                Err(ValueError::Internal("Unsupported JS type: Object".into()))
+                deserialize_object(context, r)
             }
         }
         x => Err(ValueError::Internal(format!(
@@ -533,18 +576,15 @@ impl ContextWrapper {
             let err = if value.is_exception() {
                 ExecutionError::Internal("Could get exception from runtime".into())
             } else {
-                match value.to_value() {
-                    Ok(e) => ExecutionError::Exception(e),
-                    Err(_) => match value.to_string() {
-                        Ok(strval) => {
-                            if strval.contains("out of memory") {
-                                ExecutionError::OutOfMemory
-                            } else {
-                                ExecutionError::Exception(JsValue::String(strval))
-                            }
+                match value.to_string() {
+                    Ok(strval) => {
+                        if strval.contains("out of memory") {
+                            ExecutionError::OutOfMemory
+                        } else {
+                            ExecutionError::Exception(JsValue::String(strval))
                         }
-                        Err(_) => ExecutionError::Internal("Unknown exception".into()),
-                    },
+                    }
+                    Err(_) => ExecutionError::Internal("Unknown exception".into()),
                 }
             };
             Some(err)
