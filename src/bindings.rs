@@ -62,7 +62,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                 q::JS_NewStringLen(
                     context,
                     val.as_ptr() as *const i8,
-                    val.len() as std::os::raw::c_int,
+                    val.len(),
                 )
             };
 
@@ -183,7 +183,7 @@ fn deserialize_value(
         // String.
         TAG_STRING => {
             let ptr =
-                unsafe { q::JS_ToCStringLen(context, std::ptr::null::<i32>() as *mut i32, *r, 0) };
+                unsafe { q::JS_ToCStringLen2(context, std::ptr::null::<usize>() as *mut usize, *r, 0) };
 
             if ptr.is_null() {
                 return Err(ValueError::Internal(
