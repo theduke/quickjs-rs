@@ -1,4 +1,10 @@
+#[cfg(feature = "bigint")]
+pub(crate) mod bigint;
+
 use std::{collections::HashMap, error, fmt};
+
+#[cfg(feature = "bigint")]
+pub use bigint::BigInt;
 
 /// A value that can be (de)serialized to/from the quickjs runtime.
 #[derive(PartialEq, Clone, Debug)]
@@ -15,6 +21,10 @@ pub enum JsValue {
     /// Only available with the optional `chrono` feature.
     #[cfg(feature = "chrono")]
     Date(chrono::DateTime<chrono::Utc>),
+    /// num_bigint::BigInt / JS BigInt integration
+    /// Only available with the optional `bigint` feature
+    #[cfg(feature = "bigint")]
+    BigInt(crate::BigInt),
 }
 
 impl JsValue {
@@ -91,6 +101,79 @@ value_impl_from! {
         u16 => |x| i32::from(x) => Int,
         u32 => |x| f64::from(x) => Float,
     )
+}
+
+#[cfg(feature = "bigint")]
+value_impl_from! {
+    ()
+    (
+        i64 => |x| x.into() => BigInt,
+        u64 => |x| num_bigint::BigInt::from(x).into() => BigInt,
+        i128 => |x| num_bigint::BigInt::from(x).into() => BigInt,
+        u128 => |x| num_bigint::BigInt::from(x).into() => BigInt,
+        num_bigint::BigInt => |x| x.into() => BigInt,
+    )
+}
+
+#[cfg(feature = "bigint")]
+impl std::convert::TryFrom<JsValue> for i64 {
+    type Error = ValueError;
+
+    fn try_from(value: JsValue) -> Result<Self, Self::Error> {
+        match value {
+            JsValue::Int(int) => Ok(int as i64),
+            JsValue::BigInt(bigint) => bigint.as_i64().ok_or(ValueError::UnexpectedType),
+            _ => Err(ValueError::UnexpectedType),
+        }
+    }
+}
+
+#[cfg(feature = "bigint")]
+macro_rules! value_bigint_impl_tryfrom {
+    (
+        ($($t:ty => $to_type:ident, )*)
+    ) => {
+        $(
+            impl std::convert::TryFrom<JsValue> for $t {
+                type Error = ValueError;
+
+                fn try_from(value: JsValue) -> Result<Self, Self::Error> {
+                    use num_traits::ToPrimitive;
+
+                    match value {
+                        JsValue::Int(int) => Ok(int as $t),
+                        JsValue::BigInt(bigint) => bigint
+                            .into_bigint()
+                            .$to_type()
+                            .ok_or(ValueError::UnexpectedType),
+                        _ => Err(ValueError::UnexpectedType),
+                    }
+                }
+            }
+        )*
+    }
+}
+
+#[cfg(feature = "bigint")]
+value_bigint_impl_tryfrom! {
+    (
+        u64 => to_u64,
+        i128 => to_i128,
+        u128 => to_u128,
+    )
+}
+
+#[cfg(feature = "bigint")]
+impl std::convert::TryFrom<JsValue> for num_bigint::BigInt {
+    type Error = ValueError;
+
+    fn try_from(value: JsValue) -> Result<Self, Self::Error> {
+        match value {
+            JsValue::Int(int) => Ok(num_bigint::BigInt::from(int)),
+            JsValue::BigInt(bigint) => Ok(bigint.into_bigint()),
+            _ => Err(ValueError::UnexpectedType),
+        }
+    }
 }
 
 impl<T> From<Vec<T>> for JsValue
@@ -174,3 +257,41 @@ impl fmt::Display for ValueError {
 }
 
 impl error::Error for ValueError {}
+
+#[cfg(test)]
+mod tests {
+    #[allow(unused_imports)]
+    use super::*;
+
+    #[cfg(feature = "bigint")]
+    #[test]
+    fn test_bigint_from_i64() {
+        let int = 1234i64;
+        let value = JsValue::from(int);
+        if let JsValue::BigInt(value) = value {
+            assert_eq!(value.as_i64(), Some(int));
+        } else {
+            panic!("Expected JsValue::BigInt");
+        }
+    }
+
+    #[cfg(feature = "bigint")]
+    #[test]
+    fn test_bigint_from_bigint() {
+        let bigint = num_bigint::BigInt::from(std::i128::MAX);
+        let value = JsValue::from(bigint.clone());
+        if let JsValue::BigInt(value) = value {
+            assert_eq!(value.into_bigint(), bigint);
+        } else {
+            panic!("Expected JsValue::BigInt");
+        }
+    }
+
+    #[cfg(feature = "bigint")]
+    #[test]
+    fn test_bigint_i64_bigint_eq() {
+        let value_i64 = JsValue::BigInt(1234i64.into());
+        let value_bigint = JsValue::BigInt(num_bigint::BigInt::from(1234i64).into());
+        assert_eq!(value_i64, value_bigint);
+    }
+}

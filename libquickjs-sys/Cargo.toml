@@ -21,6 +21,7 @@ copy_dir = { version = "0.1.2", optional = true }
 [features]
 bundled = ["copy_dir"]
 patched = []
+bignum = []
 default = ["bundled"]
 
 system = ["bindgen"]

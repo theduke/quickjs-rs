@@ -417,6 +417,18 @@ mod tests {
 
         let value: String = c.eval_as("var x = 44; x.toString()").unwrap();
         assert_eq!(&value, "44");
+
+        #[cfg(feature = "bigint")]
+        assert_eq!(
+            c.eval_as::<num_bigint::BigInt>("1n << 100n").unwrap(),
+            num_bigint::BigInt::from(1i128 << 100)
+        );
+
+        #[cfg(feature = "bigint")]
+        assert_eq!(c.eval_as::<i64>("1 << 30").unwrap(), 1i64 << 30);
+
+        #[cfg(feature = "bigint")]
+        assert_eq!(c.eval_as::<u128>("1n << 100n").unwrap(), 1u128 << 100);
     }
 
     #[test]
@@ -774,5 +786,66 @@ mod tests {
         };
 
         assert_eq!(d.timestamp_millis(), d2.timestamp_millis());
+    }
+
+    #[cfg(feature = "bigint")]
+    #[test]
+    fn test_bigint_deserialize_i64() {
+        for i in vec![0, std::i64::MAX, std::i64::MIN] {
+            let c = Context::new().unwrap();
+            let value = c.eval(&format!("{}n", i)).unwrap();
+            assert_eq!(value, JsValue::BigInt(i.into()));
+        }
+    }
+
+    #[cfg(feature = "bigint")]
+    #[test]
+    fn test_bigint_deserialize_bigint() {
+        for i in vec![
+            std::i64::MAX as i128 + 1,
+            std::i64::MIN as i128 - 1,
+            std::i128::MAX,
+            std::i128::MIN,
+        ] {
+            let c = Context::new().unwrap();
+            let value = c.eval(&format!("{}n", i)).unwrap();
+            let expected = num_bigint::BigInt::from(i);
+            assert_eq!(value, JsValue::BigInt(expected.into()));
+        }
+    }
+
+    #[cfg(feature = "bigint")]
+    #[test]
+    fn test_bigint_serialize_i64() {
+        for i in vec![0, std::i64::MAX, std::i64::MIN] {
+            let c = Context::new().unwrap();
+            c.eval(&format!(" function isEqual(x) {{ return x === {}n }} ", i))
+                .unwrap();
+            assert_eq!(
+                c.call_function("isEqual", vec![JsValue::BigInt(i.into())])
+                    .unwrap(),
+                JsValue::Bool(true)
+            );
+        }
+    }
+
+    #[cfg(feature = "bigint")]
+    #[test]
+    fn test_bigint_serialize_bigint() {
+        for i in vec![
+            std::i64::MAX as i128 + 1,
+            std::i64::MIN as i128 - 1,
+            std::i128::MAX,
+            std::i128::MIN,
+        ] {
+            let c = Context::new().unwrap();
+            c.eval(&format!(" function isEqual(x) {{ return x === {}n }} ", i))
+                .unwrap();
+            let value = JsValue::BigInt(num_bigint::BigInt::from(i).into());
+            assert_eq!(
+                c.call_function("isEqual", vec![value]).unwrap(),
+                JsValue::Bool(true)
+            );
+        }
     }
 }

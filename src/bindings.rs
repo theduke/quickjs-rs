@@ -7,6 +7,8 @@ use std::{
 
 use libquickjs_sys as q;
 
+#[cfg(feature = "bigint")]
+use crate::value::{bigint::BigIntOrI64, BigInt};
 use crate::{
     callback::Callback, droppable_value::DroppableValue, ContextError, ExecutionError, JsValue,
     ValueError,
@@ -14,6 +16,8 @@ use crate::{
 
 // JS_TAG_* constants from quickjs.
 // For some reason bindgen does not pick them up.
+#[cfg(feature = "bigint")]
+const TAG_BIG_INT: i64 = -10;
 const TAG_STRING: i64 = -7;
 const TAG_OBJECT: i64 = -1;
 const TAG_INT: i64 = 0;
@@ -57,6 +61,25 @@ fn js_date_constructor(context: *mut q::JSContext) -> q::JSValue {
     assert_eq!(date_constructor.tag, TAG_OBJECT);
     unsafe { free_value(context, global) };
     date_constructor
+}
+
+#[cfg(feature = "bigint")]
+fn js_create_bigint_function(context: *mut q::JSContext) -> q::JSValue {
+    let global = unsafe { q::JS_GetGlobalObject(context) };
+    assert_eq!(global.tag, TAG_OBJECT);
+
+    let bigint_function = unsafe {
+        q::JS_GetPropertyStr(
+            context,
+            global,
+            std::ffi::CStr::from_bytes_with_nul(b"BigInt\0")
+                .unwrap()
+                .as_ptr(),
+        )
+    };
+    assert_eq!(bigint_function.tag, TAG_OBJECT);
+    unsafe { free_value(context, global) };
+    bigint_function
 }
 
 /// Serialize a Rust value into a quickjs runtime value.
@@ -206,6 +229,53 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
             }
             value
         }
+        #[cfg(feature = "bigint")]
+        JsValue::BigInt(int) => match int.inner {
+            BigIntOrI64::Int(int) => unsafe { q::JS_NewBigInt64(context, int) },
+            BigIntOrI64::BigInt(bigint) => {
+                let bigint_string = bigint.to_str_radix(10);
+                let s = unsafe {
+                    q::JS_NewStringLen(
+                        context,
+                        bigint_string.as_ptr() as *const i8,
+                        bigint_string.len(),
+                    )
+                };
+                let s = DroppableValue::new(s, |&mut s| unsafe {
+                    free_value(context, s);
+                });
+                if (*s).tag != TAG_STRING {
+                    return Err(ValueError::Internal(
+                        "Could not construct String object needed to create BigInt object".into(),
+                    ));
+                }
+
+                let mut args = vec![*s];
+
+                let bigint_function = js_create_bigint_function(context);
+                let bigint_function =
+                    DroppableValue::new(bigint_function, |&mut bigint_function| unsafe {
+                        free_value(context, bigint_function);
+                    });
+                let js_bigint = unsafe {
+                    q::JS_Call(
+                        context,
+                        *bigint_function,
+                        js_null_value(),
+                        1,
+                        args.as_mut_ptr(),
+                    )
+                };
+
+                if js_bigint.tag != TAG_BIG_INT {
+                    return Err(ValueError::Internal(
+                        "Could not construct BigInt object".into(),
+                    ));
+                }
+
+                js_bigint
+            }
+        },
     };
     Ok(v)
 }
@@ -413,6 +483,35 @@ fn deserialize_value(
                 deserialize_object(context, r)
             }
         }
+        // BigInt
+        #[cfg(feature = "bigint")]
+        TAG_BIG_INT => {
+            let mut int: i64 = 0;
+            let ret = unsafe { q::JS_ToBigInt64(context, &mut int, *r) };
+            if ret == 0 {
+                Ok(JsValue::BigInt(BigInt {
+                    inner: BigIntOrI64::Int(int),
+                }))
+            } else {
+                let ptr = unsafe { q::JS_ToCStringLen2(context, std::ptr::null_mut(), *r, 0) };
+
+                if ptr.is_null() {
+                    return Err(ValueError::Internal(
+                        "Could not convert BigInt to string: got a null pointer".into(),
+                    ));
+                }
+
+                let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
+                let bigint = num_bigint::BigInt::parse_bytes(cstr.to_bytes(), 10).unwrap();
+
+                // Free the c string.
+                unsafe { q::JS_FreeCString(context, ptr) };
+
+                Ok(JsValue::BigInt(BigInt {
+                    inner: BigIntOrI64::BigInt(bigint),
+                }))
+            }
+        }
         x => Err(ValueError::Internal(format!(
             "Unhandled JS_TAG value: {}",
             x
@@ -423,6 +522,14 @@ fn deserialize_value(
 /// Helper for creating CStrings.
 fn make_cstring(value: impl Into<Vec<u8>>) -> Result<CString, ValueError> {
     CString::new(value).map_err(ValueError::StringWithZeroBytes)
+}
+
+/// Helper to construct null JsValue
+fn js_null_value() -> q::JSValue {
+    q::JSValue {
+        u: q::JSValueUnion { int32: 0 },
+        tag: TAG_NULL,
+    }
 }
 
 type WrappedCallback = dyn Fn(c_int, *mut q::JSValue) -> q::JSValue;
@@ -903,16 +1010,11 @@ impl ContextWrapper {
     ) -> Result<OwnedValueRef<'a>, ExecutionError> {
         let mut qargs = args.iter().map(|arg| arg.value).collect::<Vec<_>>();
 
-        let n = q::JSValue {
-            u: q::JSValueUnion { int32: 0 },
-            tag: TAG_NULL,
-        };
-
         let qres_raw = unsafe {
             q::JS_Call(
                 self.context,
                 function.value,
-                n,
+                js_null_value(),
                 qargs.len() as i32,
                 qargs.as_mut_ptr(),
             )
