@@ -104,10 +104,16 @@ fn apply_patches(code_dir: &PathBuf) {
     for patch in fs::read_dir("./embed/patches").expect("Could not open patches directory") {
         let patch = patch.expect("Could not open patch");
         eprintln!("Applying {:?}...", patch.file_name());
+
+        // the patch is copied to avoid escaping issues on Windows
+        let mut patch_copy = code_dir.clone();
+        patch_copy.push(patch.file_name());
+        fs::copy(patch.path(), patch_copy).expect("Could not copy patch file");
+
         let status = std::process::Command::new("patch")
             .current_dir(&code_dir)
             .arg("-i")
-            .arg(fs::canonicalize(patch.path()).expect("Cannot canonicalize patch path"))
+            .arg(patch.file_name())
             .spawn()
             .expect("Could not apply patches")
             .wait()
