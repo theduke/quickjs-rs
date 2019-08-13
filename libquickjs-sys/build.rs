@@ -6,6 +6,11 @@ fn exists(path: impl AsRef<Path>) -> bool {
     PathBuf::from(path.as_ref()).exists()
 }
 
+#[cfg(feature = "bignum")]
+const LIB_NAME: &str = "quickjs.bn";
+#[cfg(not(feature = "bignum"))]
+const LIB_NAME: &str = "quickjs";
+
 #[cfg(all(not(feature = "system"), not(feature = "bundled")))]
 fn main() {
     panic!("Invalid config for crate libquickjs-sys: must enable either the 'bundled' or the 'system' feature");
@@ -23,12 +28,12 @@ fn main() {
     panic!("Invalid configuration for libquickjs-sys: the patched feature is incompatible with the system feature");
 
     let lib = if cfg!(unix) {
-        if exists("/usr/lib/quickjs/libquickjs.a") {
+        if exists(format!("/usr/lib/quickjs/{}.a", LIB_NAME)) {
             "/usr/lib/quickjs"
         } else if exists("/usr/local/lib/quickjs") {
             "/usr/local/lib/quickjs"
         } else {
-            panic!("quicks is not supported on this platform");
+            panic!("quickjs is not supported on this platform");
         }
     } else {
         panic!("quickjs error: Windows is not supported yet");
@@ -48,7 +53,7 @@ fn main() {
 
     // Instruct cargo to statically link quickjs.
     println!("cargo:rustc-link-search=native={}", lib);
-    println!("cargo:rustc-link-lib=static=quickjs");
+    println!("cargo:rustc-link-lib=static={}", LIB_NAME);
 }
 
 #[cfg(feature = "bundled")]
@@ -66,7 +71,7 @@ fn main() {
 
     eprintln!("Compiling quickjs...");
     std::process::Command::new("make")
-        .arg("libquickjs.a")
+        .arg(format!("lib{}.a", LIB_NAME))
         .current_dir(&code_dir)
         .spawn()
         .expect("Could not compile quickjs")
@@ -81,7 +86,7 @@ fn main() {
         "cargo:rustc-link-search=native={}",
         code_dir.to_str().unwrap()
     );
-    println!("cargo:rustc-link-lib=static=quickjs");
+    println!("cargo:rustc-link-lib=static={}", LIB_NAME);
 }
 
 #[cfg(feature = "patched")]

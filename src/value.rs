@@ -15,6 +15,8 @@ pub enum JsValue {
     /// Only available with the optional `chrono` feature.
     #[cfg(feature = "chrono")]
     Date(chrono::DateTime<chrono::Utc>),
+    #[cfg(feature = "bignum")]
+    BigInt(i64),
 }
 
 impl JsValue {

@@ -14,6 +14,7 @@ use crate::{
 
 // JS_TAG_* constants from quickjs.
 // For some reason bindgen does not pick them up.
+const TAG_BIG_INT: i64 = -10;
 const TAG_STRING: i64 = -7;
 const TAG_OBJECT: i64 = -1;
 const TAG_INT: i64 = 0;
@@ -206,6 +207,8 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
             }
             value
         }
+        #[cfg(feature = "bignum")]
+        JsValue::BigInt(int) => unsafe { q::JS_NewBigInt64(context, int) },
     };
     Ok(v)
 }
@@ -412,6 +415,18 @@ fn deserialize_value(
 
                 deserialize_object(context, r)
             }
+        }
+        #[cfg(feature = "bignum")]
+        TAG_BIG_INT => {
+            let mut int: i64 = 0;
+            let ret = unsafe { q::JS_ToBigInt64(context, &mut int, *r) };
+            if ret != 0 {
+                return Err(ValueError::Internal(format!(
+                    "Could not convert BigInt to i64: returned {}",
+                    ret
+                )));
+            }
+            Ok(JsValue::BigInt(int))
         }
         x => Err(ValueError::Internal(format!(
             "Unhandled JS_TAG value: {}",

@@ -29,6 +29,8 @@ jobs:
           FEATURES: 'chrono'
         patched:
           FEATURES: 'patched,chrono'
+        bignum:
+          FEATURES: 'bignum'
 
     pool:
       vmImage: 'macOS-10.14'

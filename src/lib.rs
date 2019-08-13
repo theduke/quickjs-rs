@@ -775,4 +775,46 @@ mod tests {
 
         assert_eq!(d.timestamp_millis(), d2.timestamp_millis());
     }
+
+    #[cfg(feature = "bignum")]
+    #[test]
+    fn test_bigint_from_positive() {
+        let c = Context::new().unwrap();
+        let value = c.eval("123456789123456789n").unwrap();
+        assert_eq!(value, JsValue::BigInt(123456789123456789i64.into()));
+    }
+
+    #[cfg(feature = "bignum")]
+    #[test]
+    fn test_bigint_from_negative() {
+        let c = Context::new().unwrap();
+        let value = c.eval("-123456789123456789n").unwrap();
+        assert_eq!(value, JsValue::BigInt((-123456789123456789i64).into()));
+    }
+
+    #[cfg(feature = "bignum")]
+    #[test]
+    fn test_bigint_to_positive() {
+        let c = Context::new().unwrap();
+        c.eval("function isEqual(x) { return x === 123456789123456789n }")
+            .unwrap();
+        assert_eq!(
+            c.call_function("isEqual", vec![JsValue::BigInt(123456789123456789i64)])
+                .unwrap(),
+            JsValue::Bool(true)
+        );
+    }
+
+    #[cfg(feature = "bignum")]
+    #[test]
+    fn test_bigint_to_negative() {
+        let c = Context::new().unwrap();
+        c.eval("function isEqual(x) { return x === -123456789123456789n }")
+            .unwrap();
+        assert_eq!(
+            c.call_function("isEqual", vec![JsValue::BigInt(-123456789123456789i64)])
+                .unwrap(),
+            JsValue::Bool(true)
+        );
+    }
 }

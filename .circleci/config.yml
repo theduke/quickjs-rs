@@ -31,17 +31,24 @@ jobs:
     steps:
       - tests:
           features: "chrono"
+  test-features-bignum:
+    docker:
+      - image: debian
+    steps:
+      - tests:
+          features: "bignum"
   test-features-patched:
     docker:
       - image: debian
     steps:
       - tests:
-          features: "patched,chrono"
+          features: "patched,chrono,bignum"
+
 
 workflows:
   version: 2
   tests:
     jobs:
       - test-features-default
+      - test-features-bignum
       - test-features-patched
-
