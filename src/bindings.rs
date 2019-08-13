@@ -14,6 +14,7 @@ use crate::{
 
 // JS_TAG_* constants from quickjs.
 // For some reason bindgen does not pick them up.
+#[cfg(feature = "bignum")]
 const TAG_BIG_INT: i64 = -10;
 const TAG_STRING: i64 = -7;
 const TAG_OBJECT: i64 = -1;
