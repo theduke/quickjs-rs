@@ -1,5 +1,9 @@
 # quick-js - Changelog
 
+## v0.2.2 - 2018-08-13
+
+* Fix invalid millisecond conversion for JsValue::Date
+
 ## v0.2.1 - 2018-08-13
 
 * Impelemented deserializiation of objects to `JsValue::Object`
