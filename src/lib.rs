@@ -752,8 +752,26 @@ mod tests {
         let c = build_context();
 
         let value = c.eval(" new Date(1234567555) ").unwrap();
-        let datetime = chrono::Utc.timestamp(1234567, 555 * 1000);
+        let datetime = chrono::Utc.timestamp_millis(1234567555);
 
         assert_eq!(value, JsValue::Date(datetime));
+    }
+
+    #[cfg(feature = "chrono")]
+    #[test]
+    fn chrono_roundtrip() {
+        let c = build_context();
+
+        c.eval(" function identity(x) { return x; } ").unwrap();
+        let d = chrono::Utc::now();
+        let td = JsValue::Date(d.clone());
+        let td2 = c.call_function("identity", vec![td.clone()]).unwrap();
+        let d2 = if let JsValue::Date(x) = td2 {
+            x
+        } else {
+            panic!("expected date")
+        };
+
+        assert_eq!(d.timestamp_millis(), d2.timestamp_millis());
     }
 }

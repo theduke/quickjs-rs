@@ -167,10 +167,10 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
         JsValue::Date(datetime) => {
             let date_constructor = js_date_constructor(context);
 
+            let f = datetime.timestamp_millis() as f64;
+
             let timestamp = q::JSValue {
-                u: q::JSValueUnion {
-                    float64: datetime.timestamp_millis() as f64,
-                },
+                u: q::JSValueUnion { float64: f },
                 tag: TAG_FLOAT64,
             };
 
@@ -375,11 +375,8 @@ fn deserialize_value(
                                 "Could not convert 'Date' instance to timestamp".into(),
                             ))
                         } else {
-                            let millis = unsafe { timestamp_raw.u.float64 } as i64;
-                            let secs = millis / 1000;
-                            let nanos = (millis % 1000 * 1000) as u32;
-
-                            let datetime = chrono::Utc.timestamp(secs, nanos);
+                            let f = unsafe { timestamp_raw.u.float64 } as i64;
+                            let datetime = chrono::Utc.timestamp_millis(f);
                             Ok(JsValue::Date(datetime))
                         };
                         return res;
