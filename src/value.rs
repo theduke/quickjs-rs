@@ -95,6 +95,20 @@ value_impl_from! {
     )
 }
 
+#[cfg(feature = "bignum")]
+impl From<i64> for JsValue {
+    fn from(value: i64) -> Self {
+        JsValue::BigInt(value.into())
+    }
+}
+
+#[cfg(all(feature = "bignum", feature = "num"))]
+impl From<num_bigint::BigInt> for JsValue {
+    fn from(value: num_bigint::BigInt) -> Self {
+        JsValue::BigInt(value.into())
+    }
+}
+
 impl<T> From<Vec<T>> for JsValue
 where
     T: Into<JsValue>,
@@ -181,6 +195,30 @@ impl error::Error for ValueError {}
 mod tests {
     #[allow(unused_imports)]
     use super::*;
+
+    #[cfg(feature = "bignum")]
+    #[test]
+    fn test_bigint_from_i64() {
+        let int = 1234i64;
+        let value = JsValue::from(int);
+        if let JsValue::BigInt(value) = value {
+            assert_eq!(value.as_i64(), Some(int));
+        } else {
+            panic!("Expected JsValue::BigInt");
+        }
+    }
+
+    #[cfg(all(feature = "bignum", feature = "num"))]
+    #[test]
+    fn test_bigint_from_bigint() {
+        let bigint = num_bigint::BigInt::from(std::i128::MAX);
+        let value = JsValue::from(bigint.clone());
+        if let JsValue::BigInt(value) = value {
+            assert_eq!(value.into_bigint(), bigint);
+        } else {
+            panic!("Expected JsValue::BigInt");
+        }
+    }
 
     #[cfg(all(feature = "bignum", feature = "num"))]
     #[test]
