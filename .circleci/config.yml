@@ -37,12 +37,18 @@ jobs:
     steps:
       - tests:
           features: "bignum"
+  test-features-num:
+    docker:
+      - image: debian
+    steps:
+      - tests:
+          features: "bignum,num"
   test-features-patched:
     docker:
       - image: debian
     steps:
       - tests:
-          features: "patched,chrono,bignum"
+          features: "patched,chrono,bignum,num"
 
 
 workflows:

@@ -42,6 +42,8 @@ mod value;
 
 use std::{convert::TryFrom, error, fmt};
 
+#[cfg(feature = "bignum")]
+pub use bindings::BigInt;
 pub use callback::Callback;
 pub use value::*;
 
@@ -778,43 +780,84 @@ mod tests {
 
     #[cfg(feature = "bignum")]
     #[test]
-    fn test_bigint_from_positive() {
-        let c = Context::new().unwrap();
-        let value = c.eval("123456789123456789n").unwrap();
-        assert_eq!(value, JsValue::BigInt(123456789123456789i64.into()));
+    fn test_bigint_deserialize_i64() {
+        for i in vec![0, std::i64::MAX, std::i64::MIN] {
+            let c = Context::new().unwrap();
+            let value = c.eval(&format!("{}n", i)).unwrap();
+            assert_eq!(value, JsValue::BigInt(i.into()));
+        }
+    }
+
+    #[cfg(all(feature = "bignum", not(feature = "num")))]
+    #[test]
+    fn test_bigint_deserialize_overflow() {
+        for i in vec![
+            std::i64::MAX as i128 + 1,
+            std::i64::MIN as i128 - 1,
+            std::i128::MAX,
+            std::i128::MIN,
+        ] {
+            let c = Context::new().unwrap();
+            let result = c.eval(&format!("{}n", i)).unwrap();
+            if let JsValue::BigInt(value) = result {
+                assert_eq!(value.as_i64(), None);
+            } else {
+                unreachable!();
+            }
+        }
+    }
+
+    #[cfg(all(feature = "bignum", feature = "num"))]
+    #[test]
+    fn test_bigint_deserialize_bigint() {
+        for i in vec![
+            std::i64::MAX as i128 + 1,
+            std::i64::MIN as i128 - 1,
+            std::i128::MAX,
+            std::i128::MIN,
+        ] {
+            let c = Context::new().unwrap();
+            let value = c.eval(&format!("{}n", i)).unwrap();
+            let expected = num_bigint::BigInt::from(i);
+            assert_eq!(value, JsValue::BigInt(expected.into()));
+        }
     }
 
     #[cfg(feature = "bignum")]
     #[test]
-    fn test_bigint_from_negative() {
-        let c = Context::new().unwrap();
-        let value = c.eval("-123456789123456789n").unwrap();
-        assert_eq!(value, JsValue::BigInt((-123456789123456789i64).into()));
+    fn test_bigint_serialize_64() {
+        for i in vec![0, std::i64::MAX, std::i64::MIN] {
+            let c = Context::new().unwrap();
+            c.eval(&format!(" function isEqual(x) {{ return x === {}n }} ", i))
+                .unwrap();
+            assert_eq!(
+                c.call_function("isEqual", vec![JsValue::BigInt(i.into())])
+                    .unwrap(),
+                JsValue::Bool(true)
+            );
+        }
     }
 
-    #[cfg(feature = "bignum")]
+    #[cfg(all(feature = "bignum", feature = "num"))]
     #[test]
-    fn test_bigint_to_positive() {
-        let c = Context::new().unwrap();
-        c.eval("function isEqual(x) { return x === 123456789123456789n }")
-            .unwrap();
-        assert_eq!(
-            c.call_function("isEqual", vec![JsValue::BigInt(123456789123456789i64)])
+    fn test_bigint_serialize_bigint() {
+        for i in vec![
+            std::i64::MAX as i128 + 1,
+            std::i64::MIN as i128 - 1,
+            std::i128::MAX,
+            std::i128::MIN,
+        ] {
+            let c = Context::new().unwrap();
+            c.eval(&format!(" function isEqual(x) {{ return x === {}n }} ", i))
+                .unwrap();
+            assert_eq!(
+                c.call_function(
+                    "isEqual",
+                    vec![JsValue::BigInt(num_bigint::BigInt::from(i).into())]
+                )
                 .unwrap(),
-            JsValue::Bool(true)
-        );
-    }
-
-    #[cfg(feature = "bignum")]
-    #[test]
-    fn test_bigint_to_negative() {
-        let c = Context::new().unwrap();
-        c.eval("function isEqual(x) { return x === -123456789123456789n }")
-            .unwrap();
-        assert_eq!(
-            c.call_function("isEqual", vec![JsValue::BigInt(-123456789123456789i64)])
-                .unwrap(),
-            JsValue::Bool(true)
-        );
+                JsValue::Bool(true)
+            );
+        }
     }
 }

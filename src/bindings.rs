@@ -25,6 +25,83 @@ const TAG_UNDEFINED: i64 = 3;
 const TAG_EXCEPTION: i64 = 6;
 const TAG_FLOAT64: i64 = 7;
 
+#[cfg(feature = "bignum")]
+#[derive(Clone, Debug)]
+pub enum BigIntOrI64 {
+    Int(i64),
+    #[cfg(not(feature = "num"))]
+    Overflow,
+    #[cfg(feature = "num")]
+    BigInt(num_bigint::BigInt),
+}
+
+#[cfg(feature = "bignum")]
+impl PartialEq for BigIntOrI64 {
+    fn eq(&self, other: &Self) -> bool {
+        use BigIntOrI64::*;
+        match (&self, &other) {
+            (Int(i), Int(j)) => i == j,
+            #[cfg(not(feature = "num"))]
+            (Overflow, _) | (_, Overflow) => false, // two overflows are not equal, like NaNs
+            #[cfg(feature = "num")]
+            (Int(i), BigInt(b)) | (BigInt(b), Int(i)) => b == &num_bigint::BigInt::from(*i),
+            #[cfg(feature = "num")]
+            (BigInt(a), BigInt(b)) => a == b,
+        }
+    }
+}
+
+/// A value holding JavaScript
+/// [BigInt](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) type
+#[cfg(feature = "bignum")]
+#[derive(Clone, Debug, PartialEq)]
+pub struct BigInt {
+    inner: BigIntOrI64,
+}
+
+#[cfg(feature = "bignum")]
+impl BigInt {
+    /// Return `Some` if value fits into `i64` and `None` otherwise
+    pub fn as_i64(&self) -> Option<i64> {
+        match &self.inner {
+            BigIntOrI64::Int(int) => Some(*int),
+            #[cfg(not(feature = "num"))]
+            BigIntOrI64::Overflow => None,
+            #[cfg(feature = "num")]
+            BigIntOrI64::BigInt(bigint) => {
+                use num_traits::cast::ToPrimitive;
+                bigint.to_i64()
+            }
+        }
+    }
+    /// Convert value into `num_bigint::BigInt`
+    #[cfg(all(feature = "bignum", feature = "num"))]
+    pub fn into_bigint(self) -> num_bigint::BigInt {
+        match self.inner {
+            BigIntOrI64::Int(int) => int.into(),
+            BigIntOrI64::BigInt(bigint) => bigint,
+        }
+    }
+}
+
+#[cfg(feature = "bignum")]
+impl From<i64> for BigInt {
+    fn from(int: i64) -> Self {
+        BigInt {
+            inner: BigIntOrI64::Int(int),
+        }
+    }
+}
+
+#[cfg(all(feature = "bignum", feature = "num"))]
+impl From<num_bigint::BigInt> for BigInt {
+    fn from(bigint: num_bigint::BigInt) -> Self {
+        BigInt {
+            inner: BigIntOrI64::BigInt(bigint),
+        }
+    }
+}
+
 /// Free a JSValue.
 /// This function is the equivalent of JS_FreeValue from quickjs, which can not
 /// be used due to being `static inline`.
@@ -59,6 +136,25 @@ fn js_date_constructor(context: *mut q::JSContext) -> q::JSValue {
     assert_eq!(date_constructor.tag, TAG_OBJECT);
     unsafe { free_value(context, global) };
     date_constructor
+}
+
+#[cfg(all(feature = "bignum", feature = "num"))]
+fn js_bigint_function(context: *mut q::JSContext) -> q::JSValue {
+    let global = unsafe { q::JS_GetGlobalObject(context) };
+    assert_eq!(global.tag, TAG_OBJECT);
+
+    let bigint_function = unsafe {
+        q::JS_GetPropertyStr(
+            context,
+            global,
+            std::ffi::CStr::from_bytes_with_nul(b"BigInt\0")
+                .unwrap()
+                .as_ptr(),
+        )
+    };
+    assert_eq!(bigint_function.tag, TAG_OBJECT);
+    unsafe { free_value(context, global) };
+    bigint_function
 }
 
 /// Serialize a Rust value into a quickjs runtime value.
@@ -209,7 +305,51 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
             value
         }
         #[cfg(feature = "bignum")]
-        JsValue::BigInt(int) => unsafe { q::JS_NewBigInt64(context, int) },
+        JsValue::BigInt(int) => match int.inner {
+            BigIntOrI64::Int(int) => unsafe { q::JS_NewBigInt64(context, int) },
+            #[cfg(not(feature = "num"))]
+            BigIntOrI64::Overflow => js_null_value(),
+            #[cfg(feature = "num")]
+            BigIntOrI64::BigInt(bigint) => {
+                let bigint_string = bigint.to_str_radix(10);
+                let s = unsafe {
+                    q::JS_NewStringLen(
+                        context,
+                        bigint_string.as_ptr() as *const i8,
+                        bigint_string.len(),
+                    )
+                };
+                if s.tag != TAG_STRING {
+                    return Err(ValueError::Internal(
+                        "Could not construct String object needed to create BigInt object".into(),
+                    ));
+                }
+
+                let mut args = vec![s];
+
+                let bigint_function = js_bigint_function(context);
+                let js_bigint = unsafe {
+                    q::JS_Call(
+                        context,
+                        bigint_function,
+                        js_null_value(),
+                        1,
+                        args.as_mut_ptr(),
+                    )
+                };
+                unsafe {
+                    free_value(context, bigint_function);
+                }
+
+                if js_bigint.tag != TAG_BIG_INT {
+                    return Err(ValueError::Internal(
+                        "Could not construct BigInt object".into(),
+                    ));
+                }
+
+                js_bigint
+            }
+        },
     };
     Ok(v)
 }
@@ -417,17 +557,46 @@ fn deserialize_value(
                 deserialize_object(context, r)
             }
         }
+        // BigInt
         #[cfg(feature = "bignum")]
         TAG_BIG_INT => {
             let mut int: i64 = 0;
             let ret = unsafe { q::JS_ToBigInt64(context, &mut int, *r) };
-            if ret != 0 {
-                return Err(ValueError::Internal(format!(
-                    "Could not convert BigInt to i64: returned {}",
-                    ret
-                )));
+            if ret == 0 {
+                Ok(JsValue::BigInt(BigInt {
+                    inner: BigIntOrI64::Int(int),
+                }))
+            } else {
+                if ret == -1 {
+                    return Err(ValueError::Internal("Internal BigInt error".into()));
+                }
+                #[cfg(not(feature = "num"))]
+                {
+                    Ok(JsValue::BigInt(BigInt {
+                        inner: BigIntOrI64::Overflow,
+                    }))
+                }
+                #[cfg(feature = "num")]
+                {
+                    let ptr = unsafe { q::JS_ToCStringLen2(context, std::ptr::null_mut(), *r, 0) };
+
+                    if ptr.is_null() {
+                        return Err(ValueError::Internal(
+                            "Could not convert BigInt to string: got a null pointer".into(),
+                        ));
+                    }
+
+                    let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
+                    let bigint = num_bigint::BigInt::parse_bytes(cstr.to_bytes(), 10).unwrap();
+
+                    // Free the c string.
+                    unsafe { q::JS_FreeCString(context, ptr) };
+
+                    Ok(JsValue::BigInt(BigInt {
+                        inner: BigIntOrI64::BigInt(bigint),
+                    }))
+                }
             }
-            Ok(JsValue::BigInt(int))
         }
         x => Err(ValueError::Internal(format!(
             "Unhandled JS_TAG value: {}",
@@ -439,6 +608,14 @@ fn deserialize_value(
 /// Helper for creating CStrings.
 fn make_cstring(value: impl Into<Vec<u8>>) -> Result<CString, ValueError> {
     CString::new(value).map_err(ValueError::StringWithZeroBytes)
+}
+
+/// Helper to construct null JsValue
+fn js_null_value() -> q::JSValue {
+    q::JSValue {
+        u: q::JSValueUnion { int32: 0 },
+        tag: TAG_NULL,
+    }
 }
 
 type WrappedCallback = dyn Fn(c_int, *mut q::JSValue) -> q::JSValue;
@@ -916,16 +1093,11 @@ impl ContextWrapper {
     ) -> Result<OwnedValueRef<'a>, ExecutionError> {
         let mut qargs = args.iter().map(|arg| arg.value).collect::<Vec<_>>();
 
-        let n = q::JSValue {
-            u: q::JSValueUnion { int32: 0 },
-            tag: TAG_NULL,
-        };
-
         let qres_raw = unsafe {
             q::JS_Call(
                 self.context,
                 function.value,
-                n,
+                js_null_value(),
                 qargs.len() as i32,
                 qargs.as_mut_ptr(),
             )
@@ -1013,5 +1185,55 @@ impl ContextWrapper {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[allow(unused_imports)]
+    use super::*;
+
+    #[cfg(feature = "bignum")]
+    #[test]
+    fn test_bigint_as_i64() {
+        let value = BigInt {
+            inner: BigIntOrI64::Int(1234i64),
+        };
+        assert_eq!(value.as_i64(), Some(1234i64));
+    }
+
+    #[cfg(all(feature = "bignum", not(feature = "num")))]
+    #[test]
+    fn test_bigint_as_i64_overflow() {
+        let value = BigInt {
+            inner: BigIntOrI64::Overflow,
+        };
+        assert_eq!(value.as_i64(), None);
+    }
+
+    #[cfg(all(feature = "bignum", feature = "num"))]
+    #[test]
+    fn test_bigint_as_i64_overflow() {
+        let value = BigInt {
+            inner: BigIntOrI64::BigInt(num_bigint::BigInt::from(std::i128::MAX)),
+        };
+        assert_eq!(value.as_i64(), None);
+    }
+
+    #[cfg(all(feature = "bignum", feature = "num"))]
+    #[test]
+    fn test_bigint_into_bigint() {
+        for i in vec![
+            0 as i128,
+            std::i64::MAX as i128,
+            std::i64::MIN as i128,
+            std::i128::MAX,
+            std::i128::MIN,
+        ] {
+            let value = BigInt {
+                inner: BigIntOrI64::BigInt(num_bigint::BigInt::from(i)),
+            };
+            assert_eq!(value.into_bigint(), num_bigint::BigInt::from(i));
+        }
     }
 }

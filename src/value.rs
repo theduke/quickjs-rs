@@ -16,7 +16,7 @@ pub enum JsValue {
     #[cfg(feature = "chrono")]
     Date(chrono::DateTime<chrono::Utc>),
     #[cfg(feature = "bignum")]
-    BigInt(i64),
+    BigInt(crate::BigInt),
 }
 
 impl JsValue {
@@ -176,3 +176,17 @@ impl fmt::Display for ValueError {
 }
 
 impl error::Error for ValueError {}
+
+#[cfg(test)]
+mod tests {
+    #[allow(unused_imports)]
+    use super::*;
+
+    #[cfg(all(feature = "bignum", feature = "num"))]
+    #[test]
+    fn test_bigint_i64_bigint_eq() {
+        let value_i64 = JsValue::BigInt(1234i64.into());
+        let value_bigint = JsValue::BigInt(num_bigint::BigInt::from(1234i64).into());
+        assert_eq!(value_i64, value_bigint);
+    }
+}
