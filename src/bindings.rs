@@ -149,7 +149,15 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                     e
                 })?;
 
-                let ret = unsafe { q::JS_SetPropertyStr(context, obj, ckey.as_ptr(), qvalue) };
+                let ret = unsafe {
+                    q::JS_DefinePropertyValueStr(
+                        context,
+                        obj,
+                        ckey.as_ptr(),
+                        qvalue,
+                        q::JS_PROP_C_W_E as i32,
+                    )
+                };
                 if ret < 0 {
                     // Free the object if a property failed.
                     unsafe {
