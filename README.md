@@ -7,7 +7,7 @@
 
 A Rust wrapper for [QuickJS](https://bellard.org/quickjs/). 
 
-QuickJS is a new, small Javascript engine by Fabrice Bellard. 
+QuickJS is a new, small Javascript engine by Fabrice Bellard and Charlie Gordon. 
 It is fast and supports the full ES2020 specification.
 
 This crate allows you to easily run and integrate with Javascript code from Rust.
