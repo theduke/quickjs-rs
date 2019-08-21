@@ -2732,6 +2732,12 @@ extern "C" {
     ) -> JSValue;
 }
 extern "C" {
+    pub fn JS_DetectModule(
+        input: *const ::std::os::raw::c_char,
+        input_len: usize,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
     pub fn JS_Eval(
         ctx: *mut JSContext,
         input: *const ::std::os::raw::c_char,
