@@ -292,6 +292,17 @@ fn deserialize_object(context: *mut q::JSContext, obj: &q::JSValue) -> Result<Js
         };
         map.insert(key, value);
     }
+
+    for index in 0..count {
+        let prop = unsafe { properties.offset(index as isize) };
+        unsafe {
+            q::JS_FreeAtom(context, (*prop).atom);
+        }
+    }
+    unsafe {
+        q::js_free(context, properties as *mut std::ffi::c_void);
+    }
+
     Ok(JsValue::Object(map))
 }
 
