@@ -37,6 +37,7 @@
 
 mod bindings;
 mod callback;
+mod droppable_value;
 mod value;
 
 use std::{convert::TryFrom, error, fmt};
