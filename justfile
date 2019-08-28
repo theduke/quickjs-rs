@@ -22,7 +22,7 @@ update-quickjs: download-new generate-bindings download-cleanup
 
 ci-debian-setup:
     echo "Installing dependencies..."
-    apt update && apt-get install -y curl xz-utils build-essential gcc-multilib libclang-dev clang
+    apt update && apt-get install -y curl xz-utils build-essential gcc-multilib libclang-dev clang valgrind
 
 ci-test:
     # Limit test threads to 1 to show test name before execution.
@@ -37,7 +37,11 @@ ci-lint:
     echo "Checking clippy..."
     cargo clippy
 
-ci-debian: ci-debian-setup ci-test ci-lint
+ci-valgrind:
+    echo "Checking for memory leaks..."
+    find target/debug -maxdepth 1 -type f -executable | xargs valgrind --leak-check=full --error-exitcode=1
+
+ci-debian: ci-debian-setup ci-test ci-lint ci-valgrind
 
 ci-macos-setup:
     echo "setup"
