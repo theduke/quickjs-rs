@@ -7,7 +7,10 @@ use std::{
 
 use libquickjs_sys as q;
 
-use crate::{callback::Callback, ContextError, ExecutionError, JsValue, ValueError};
+use crate::{
+    callback::Callback, droppable_value::DroppableValue, ContextError, ExecutionError, JsValue,
+    ValueError,
+};
 
 // JS_TAG_* constants from quickjs.
 // For some reason bindgen does not pick them up.
@@ -259,9 +262,21 @@ fn deserialize_object(context: *mut q::JSContext, obj: &q::JSValue) -> Result<Js
         ));
     }
 
+    let properties = DroppableValue::new(properties, |&mut properties| {
+        for index in 0..count {
+            let prop = unsafe { properties.offset(index as isize) };
+            unsafe {
+                q::JS_FreeAtom(context, (*prop).atom);
+            }
+        }
+        unsafe {
+            q::js_free(context, properties as *mut std::ffi::c_void);
+        }
+    });
+
     let mut map = HashMap::new();
     for index in 0..count {
-        let prop = unsafe { properties.offset(index as isize) };
+        let prop = unsafe { (*properties).offset(index as isize) };
         let raw_value = unsafe { q::JS_GetPropertyInternal(context, *obj, (*prop).atom, *obj, 0) };
         if raw_value.tag == TAG_EXCEPTION {
             return Err(ValueError::Internal("Could not get object property".into()));
@@ -291,16 +306,6 @@ fn deserialize_object(context: *mut q::JSContext, obj: &q::JSValue) -> Result<Js
             }
         };
         map.insert(key, value);
-    }
-
-    for index in 0..count {
-        let prop = unsafe { properties.offset(index as isize) };
-        unsafe {
-            q::JS_FreeAtom(context, (*prop).atom);
-        }
-    }
-    unsafe {
-        q::js_free(context, properties as *mut std::ffi::c_void);
     }
 
     Ok(JsValue::Object(map))
