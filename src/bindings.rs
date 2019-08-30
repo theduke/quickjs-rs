@@ -262,6 +262,7 @@ fn deserialize_object(context: *mut q::JSContext, obj: &q::JSValue) -> Result<Js
         ));
     }
 
+    // TODO: refactor into a more Rust-idiomatic iterator wrapper.
     let properties = DroppableValue::new(properties, |&mut properties| {
         for index in 0..count {
             let prop = unsafe { properties.offset(index as isize) };
