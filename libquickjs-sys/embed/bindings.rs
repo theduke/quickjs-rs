@@ -147,7 +147,6 @@ pub const JS_GPN_SYMBOL_MASK: u32 = 2;
 pub const JS_GPN_PRIVATE_MASK: u32 = 4;
 pub const JS_GPN_ENUM_ONLY: u32 = 16;
 pub const JS_GPN_SET_ENUM: u32 = 32;
-pub const JS_EVAL_BINARY_LOAD_ONLY: u32 = 1;
 pub const JS_WRITE_OBJ_BYTECODE: u32 = 1;
 pub const JS_WRITE_OBJ_BSWAP: u32 = 2;
 pub const JS_READ_OBJ_BYTECODE: u32 = 1;
@@ -2732,6 +2731,12 @@ extern "C" {
     ) -> JSValue;
 }
 extern "C" {
+    pub fn JS_DetectModule(
+        input: *const ::std::os::raw::c_char,
+        input_len: usize,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
     pub fn JS_Eval(
         ctx: *mut JSContext,
         input: *const ::std::os::raw::c_char,
@@ -2741,12 +2746,7 @@ extern "C" {
     ) -> JSValue;
 }
 extern "C" {
-    pub fn JS_EvalBinary(
-        ctx: *mut JSContext,
-        buf: *const u8,
-        buf_len: usize,
-        flags: ::std::os::raw::c_int,
-    ) -> JSValue;
+    pub fn JS_EvalFunction(ctx: *mut JSContext, fun_obj: JSValue) -> JSValue;
 }
 extern "C" {
     pub fn JS_GetGlobalObject(ctx: *mut JSContext) -> JSValue;
@@ -2892,6 +2892,12 @@ extern "C" {
         opaque: *mut ::std::os::raw::c_void,
     );
 }
+extern "C" {
+    pub fn JS_GetImportMeta(ctx: *mut JSContext, m: *mut JSModuleDef) -> JSValue;
+}
+extern "C" {
+    pub fn JS_GetModuleName(ctx: *mut JSContext, m: *mut JSModuleDef) -> JSAtom;
+}
 pub type JSJobFunc = ::std::option::Option<
     unsafe extern "C" fn(
         ctx: *mut JSContext,
@@ -2933,7 +2939,7 @@ extern "C" {
     ) -> JSValue;
 }
 extern "C" {
-    pub fn JS_EvalFunction(ctx: *mut JSContext, fun_obj: JSValue, this_obj: JSValue) -> JSValue;
+    pub fn JS_ResolveModule(ctx: *mut JSContext, obj: JSValue) -> ::std::os::raw::c_int;
 }
 pub const JSCFunctionEnum_JS_CFUNC_generic: JSCFunctionEnum = 0;
 pub const JSCFunctionEnum_JS_CFUNC_generic_magic: JSCFunctionEnum = 1;
