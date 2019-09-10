@@ -1,3 +1,5 @@
+#[cfg(feature = "num-bigint")]
+use num_traits::cast::ToPrimitive;
 use std::{
     collections::HashMap,
     ffi::CString,
@@ -14,7 +16,7 @@ use crate::{
 
 // JS_TAG_* constants from quickjs.
 // For some reason bindgen does not pick them up.
-#[cfg(feature = "bignum")]
+#[cfg(feature = "num-bigint")]
 const TAG_BIG_INT: i64 = -10;
 const TAG_STRING: i64 = -7;
 const TAG_OBJECT: i64 = -1;
@@ -25,27 +27,20 @@ const TAG_UNDEFINED: i64 = 3;
 const TAG_EXCEPTION: i64 = 6;
 const TAG_FLOAT64: i64 = 7;
 
-#[cfg(feature = "bignum")]
+#[cfg(feature = "num-bigint")]
 #[derive(Clone, Debug)]
 pub enum BigIntOrI64 {
     Int(i64),
-    #[cfg(not(feature = "num"))]
-    Overflow,
-    #[cfg(feature = "num")]
     BigInt(num_bigint::BigInt),
 }
 
-#[cfg(feature = "bignum")]
+#[cfg(feature = "num-bigint")]
 impl PartialEq for BigIntOrI64 {
     fn eq(&self, other: &Self) -> bool {
         use BigIntOrI64::*;
         match (&self, &other) {
             (Int(i), Int(j)) => i == j,
-            #[cfg(not(feature = "num"))]
-            (Overflow, _) | (_, Overflow) => false, // two overflows are not equal, like NaNs
-            #[cfg(feature = "num")]
             (Int(i), BigInt(b)) | (BigInt(b), Int(i)) => b == &num_bigint::BigInt::from(*i),
-            #[cfg(feature = "num")]
             (BigInt(a), BigInt(b)) => a == b,
         }
     }
@@ -53,29 +48,22 @@ impl PartialEq for BigIntOrI64 {
 
 /// A value holding JavaScript
 /// [BigInt](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) type
-#[cfg(feature = "bignum")]
+#[cfg(feature = "num-bigint")]
 #[derive(Clone, Debug, PartialEq)]
 pub struct BigInt {
     inner: BigIntOrI64,
 }
 
-#[cfg(feature = "bignum")]
+#[cfg(feature = "num-bigint")]
 impl BigInt {
     /// Return `Some` if value fits into `i64` and `None` otherwise
     pub fn as_i64(&self) -> Option<i64> {
         match &self.inner {
             BigIntOrI64::Int(int) => Some(*int),
-            #[cfg(not(feature = "num"))]
-            BigIntOrI64::Overflow => None,
-            #[cfg(feature = "num")]
-            BigIntOrI64::BigInt(bigint) => {
-                use num_traits::cast::ToPrimitive;
-                bigint.to_i64()
-            }
+            BigIntOrI64::BigInt(bigint) => bigint.to_i64(),
         }
     }
     /// Convert value into `num_bigint::BigInt`
-    #[cfg(all(feature = "bignum", feature = "num"))]
     pub fn into_bigint(self) -> num_bigint::BigInt {
         match self.inner {
             BigIntOrI64::Int(int) => int.into(),
@@ -84,7 +72,7 @@ impl BigInt {
     }
 }
 
-#[cfg(feature = "bignum")]
+#[cfg(feature = "num-bigint")]
 impl From<i64> for BigInt {
     fn from(int: i64) -> Self {
         BigInt {
@@ -93,7 +81,7 @@ impl From<i64> for BigInt {
     }
 }
 
-#[cfg(all(feature = "bignum", feature = "num"))]
+#[cfg(feature = "num-bigint")]
 impl From<num_bigint::BigInt> for BigInt {
     fn from(bigint: num_bigint::BigInt) -> Self {
         BigInt {
@@ -138,7 +126,7 @@ fn js_date_constructor(context: *mut q::JSContext) -> q::JSValue {
     date_constructor
 }
 
-#[cfg(all(feature = "bignum", feature = "num"))]
+#[cfg(feature = "num-bigint")]
 fn js_bigint_function(context: *mut q::JSContext) -> q::JSValue {
     let global = unsafe { q::JS_GetGlobalObject(context) };
     assert_eq!(global.tag, TAG_OBJECT);
@@ -304,12 +292,10 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
             }
             value
         }
-        #[cfg(feature = "bignum")]
+        #[cfg(feature = "num-bigint")]
         JsValue::BigInt(int) => match int.inner {
             BigIntOrI64::Int(int) => unsafe { q::JS_NewBigInt64(context, int) },
-            #[cfg(not(feature = "num"))]
-            BigIntOrI64::Overflow => js_null_value(),
-            #[cfg(feature = "num")]
+            #[cfg(feature = "num-bigint")]
             BigIntOrI64::BigInt(bigint) => {
                 let bigint_string = bigint.to_str_radix(10);
                 let s = unsafe {
@@ -558,7 +544,7 @@ fn deserialize_value(
             }
         }
         // BigInt
-        #[cfg(feature = "bignum")]
+        #[cfg(feature = "num-bigint")]
         TAG_BIG_INT => {
             let mut int: i64 = 0;
             let ret = unsafe { q::JS_ToBigInt64(context, &mut int, *r) };
@@ -570,13 +556,7 @@ fn deserialize_value(
                 if ret == -1 {
                     return Err(ValueError::Internal("Internal BigInt error".into()));
                 }
-                #[cfg(not(feature = "num"))]
-                {
-                    Ok(JsValue::BigInt(BigInt {
-                        inner: BigIntOrI64::Overflow,
-                    }))
-                }
-                #[cfg(feature = "num")]
+                #[cfg(feature = "num-bigint")]
                 {
                     let ptr = unsafe { q::JS_ToCStringLen2(context, std::ptr::null_mut(), *r, 0) };
 
@@ -1193,7 +1173,7 @@ mod tests {
     #[allow(unused_imports)]
     use super::*;
 
-    #[cfg(feature = "bignum")]
+    #[cfg(feature = "num-bigint")]
     #[test]
     fn test_bigint_as_i64() {
         let value = BigInt {
@@ -1202,16 +1182,7 @@ mod tests {
         assert_eq!(value.as_i64(), Some(1234i64));
     }
 
-    #[cfg(all(feature = "bignum", not(feature = "num")))]
-    #[test]
-    fn test_bigint_as_i64_overflow() {
-        let value = BigInt {
-            inner: BigIntOrI64::Overflow,
-        };
-        assert_eq!(value.as_i64(), None);
-    }
-
-    #[cfg(all(feature = "bignum", feature = "num"))]
+    #[cfg(feature = "num-bigint")]
     #[test]
     fn test_bigint_as_i64_overflow() {
         let value = BigInt {
@@ -1220,7 +1191,7 @@ mod tests {
         assert_eq!(value.as_i64(), None);
     }
 
-    #[cfg(all(feature = "bignum", feature = "num"))]
+    #[cfg(feature = "num-bigint")]
     #[test]
     fn test_bigint_into_bigint() {
         for i in vec![

@@ -35,6 +35,9 @@
 #![deny(warnings)]
 #![deny(missing_docs)]
 
+#[cfg(feature = "num-bigint")]
+extern crate num_bigint_bare as num_bigint;
+
 mod bindings;
 mod callback;
 mod droppable_value;
@@ -42,7 +45,7 @@ mod value;
 
 use std::{convert::TryFrom, error, fmt};
 
-#[cfg(feature = "bignum")]
+#[cfg(feature = "num-bigint")]
 pub use bindings::BigInt;
 pub use callback::Callback;
 pub use value::*;
@@ -778,7 +781,7 @@ mod tests {
         assert_eq!(d.timestamp_millis(), d2.timestamp_millis());
     }
 
-    #[cfg(feature = "bignum")]
+    #[cfg(feature = "num-bigint")]
     #[test]
     fn test_bigint_deserialize_i64() {
         for i in vec![0, std::i64::MAX, std::i64::MIN] {
@@ -788,26 +791,7 @@ mod tests {
         }
     }
 
-    #[cfg(all(feature = "bignum", not(feature = "num")))]
-    #[test]
-    fn test_bigint_deserialize_overflow() {
-        for i in vec![
-            std::i64::MAX as i128 + 1,
-            std::i64::MIN as i128 - 1,
-            std::i128::MAX,
-            std::i128::MIN,
-        ] {
-            let c = Context::new().unwrap();
-            let result = c.eval(&format!("{}n", i)).unwrap();
-            if let JsValue::BigInt(value) = result {
-                assert_eq!(value.as_i64(), None);
-            } else {
-                unreachable!();
-            }
-        }
-    }
-
-    #[cfg(all(feature = "bignum", feature = "num"))]
+    #[cfg(feature = "num-bigint")]
     #[test]
     fn test_bigint_deserialize_bigint() {
         for i in vec![
@@ -823,7 +807,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "bignum")]
+    #[cfg(feature = "num-bigint")]
     #[test]
     fn test_bigint_serialize_64() {
         for i in vec![0, std::i64::MAX, std::i64::MIN] {
@@ -838,7 +822,7 @@ mod tests {
         }
     }
 
-    #[cfg(all(feature = "bignum", feature = "num"))]
+    #[cfg(feature = "num-bigint")]
     #[test]
     fn test_bigint_serialize_bigint() {
         for i in vec![

@@ -15,7 +15,9 @@ pub enum JsValue {
     /// Only available with the optional `chrono` feature.
     #[cfg(feature = "chrono")]
     Date(chrono::DateTime<chrono::Utc>),
-    #[cfg(feature = "bignum")]
+    /// num_bigint::BigInt / JS BigInt integration
+    /// Only available with the optional `num-bigint` feature
+    #[cfg(feature = "num-bigint")]
     BigInt(crate::BigInt),
 }
 
@@ -95,14 +97,14 @@ value_impl_from! {
     )
 }
 
-#[cfg(feature = "bignum")]
+#[cfg(feature = "num-bigint")]
 impl From<i64> for JsValue {
     fn from(value: i64) -> Self {
         JsValue::BigInt(value.into())
     }
 }
 
-#[cfg(all(feature = "bignum", feature = "num"))]
+#[cfg(feature = "num-bigint")]
 impl From<num_bigint::BigInt> for JsValue {
     fn from(value: num_bigint::BigInt) -> Self {
         JsValue::BigInt(value.into())
@@ -196,7 +198,7 @@ mod tests {
     #[allow(unused_imports)]
     use super::*;
 
-    #[cfg(feature = "bignum")]
+    #[cfg(feature = "num-bigint")]
     #[test]
     fn test_bigint_from_i64() {
         let int = 1234i64;
@@ -208,7 +210,7 @@ mod tests {
         }
     }
 
-    #[cfg(all(feature = "bignum", feature = "num"))]
+    #[cfg(feature = "num-bigint")]
     #[test]
     fn test_bigint_from_bigint() {
         let bigint = num_bigint::BigInt::from(std::i128::MAX);
@@ -220,7 +222,7 @@ mod tests {
         }
     }
 
-    #[cfg(all(feature = "bignum", feature = "num"))]
+    #[cfg(feature = "num-bigint")]
     #[test]
     fn test_bigint_i64_bigint_eq() {
         let value_i64 = JsValue::BigInt(1234i64.into());
