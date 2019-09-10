@@ -38,6 +38,8 @@
 #[cfg(feature = "num-bigint")]
 extern crate num_bigint_bare as num_bigint;
 
+#[cfg(feature = "num-bigint")]
+mod bigint;
 mod bindings;
 mod callback;
 mod droppable_value;
@@ -46,7 +48,7 @@ mod value;
 use std::{convert::TryFrom, error, fmt};
 
 #[cfg(feature = "num-bigint")]
-pub use bindings::BigInt;
+pub use bigint::BigInt;
 pub use callback::Callback;
 pub use value::*;
 

@@ -1,5 +1,3 @@
-#[cfg(feature = "num-bigint")]
-use num_traits::cast::ToPrimitive;
 use std::{
     collections::HashMap,
     ffi::CString,
@@ -9,6 +7,8 @@ use std::{
 
 use libquickjs_sys as q;
 
+#[cfg(feature = "num-bigint")]
+use crate::bigint::{BigInt, BigIntOrI64};
 use crate::{
     callback::Callback, droppable_value::DroppableValue, ContextError, ExecutionError, JsValue,
     ValueError,
@@ -26,69 +26,6 @@ const TAG_NULL: i64 = 2;
 const TAG_UNDEFINED: i64 = 3;
 const TAG_EXCEPTION: i64 = 6;
 const TAG_FLOAT64: i64 = 7;
-
-#[cfg(feature = "num-bigint")]
-#[derive(Clone, Debug)]
-pub enum BigIntOrI64 {
-    Int(i64),
-    BigInt(num_bigint::BigInt),
-}
-
-#[cfg(feature = "num-bigint")]
-impl PartialEq for BigIntOrI64 {
-    fn eq(&self, other: &Self) -> bool {
-        use BigIntOrI64::*;
-        match (&self, &other) {
-            (Int(i), Int(j)) => i == j,
-            (Int(i), BigInt(b)) | (BigInt(b), Int(i)) => b == &num_bigint::BigInt::from(*i),
-            (BigInt(a), BigInt(b)) => a == b,
-        }
-    }
-}
-
-/// A value holding JavaScript
-/// [BigInt](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) type
-#[cfg(feature = "num-bigint")]
-#[derive(Clone, Debug, PartialEq)]
-pub struct BigInt {
-    inner: BigIntOrI64,
-}
-
-#[cfg(feature = "num-bigint")]
-impl BigInt {
-    /// Return `Some` if value fits into `i64` and `None` otherwise
-    pub fn as_i64(&self) -> Option<i64> {
-        match &self.inner {
-            BigIntOrI64::Int(int) => Some(*int),
-            BigIntOrI64::BigInt(bigint) => bigint.to_i64(),
-        }
-    }
-    /// Convert value into `num_bigint::BigInt`
-    pub fn into_bigint(self) -> num_bigint::BigInt {
-        match self.inner {
-            BigIntOrI64::Int(int) => int.into(),
-            BigIntOrI64::BigInt(bigint) => bigint,
-        }
-    }
-}
-
-#[cfg(feature = "num-bigint")]
-impl From<i64> for BigInt {
-    fn from(int: i64) -> Self {
-        BigInt {
-            inner: BigIntOrI64::Int(int),
-        }
-    }
-}
-
-#[cfg(feature = "num-bigint")]
-impl From<num_bigint::BigInt> for BigInt {
-    fn from(bigint: num_bigint::BigInt) -> Self {
-        BigInt {
-            inner: BigIntOrI64::BigInt(bigint),
-        }
-    }
-}
 
 /// Free a JSValue.
 /// This function is the equivalent of JS_FreeValue from quickjs, which can not
