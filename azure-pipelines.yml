@@ -27,12 +27,10 @@ jobs:
       matrix:
         default:
           FEATURES: 'chrono'
+        num-bigint:
+          FEATURES: 'num-bigint'
         patched:
-          FEATURES: 'patched,chrono,bignum,num-bigint'
-        bignum:
-          FEATURES: 'bignum'
-        bignum_bigint:
-          FEATURES: 'bignum,num-bigint'
+          FEATURES: 'patched,chrono,num-bigint'
 
     pool:
       vmImage: 'macOS-10.14'
