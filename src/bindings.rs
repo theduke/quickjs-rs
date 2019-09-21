@@ -691,6 +691,9 @@ impl ContextWrapper {
 
         let context = unsafe { q::JS_NewContext(runtime) };
         if context.is_null() {
+            unsafe {
+                q::JS_FreeRuntime(runtime);
+            }
             return Err(ContextError::ContextCreationFailed);
         }
 
