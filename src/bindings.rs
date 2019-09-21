@@ -242,27 +242,31 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                         bigint_string.len(),
                     )
                 };
-                if s.tag != TAG_STRING {
+                let s = DroppableValue::new(s, |&mut s| unsafe {
+                    free_value(context, s);
+                });
+                if (*s).tag != TAG_STRING {
                     return Err(ValueError::Internal(
                         "Could not construct String object needed to create BigInt object".into(),
                     ));
                 }
 
-                let mut args = vec![s];
+                let mut args = vec![*s];
 
                 let bigint_function = js_bigint_function(context);
+                let bigint_function =
+                    DroppableValue::new(bigint_function, |&mut bigint_function| unsafe {
+                        free_value(context, bigint_function);
+                    });
                 let js_bigint = unsafe {
                     q::JS_Call(
                         context,
-                        bigint_function,
+                        *bigint_function,
                         js_null_value(),
                         1,
                         args.as_mut_ptr(),
                     )
                 };
-                unsafe {
-                    free_value(context, bigint_function);
-                }
 
                 if js_bigint.tag != TAG_BIG_INT {
                     return Err(ValueError::Internal(
