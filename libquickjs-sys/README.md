@@ -5,7 +5,7 @@ FFI Bindings for [quickjs](https://bellard.org/quickjs/), a Javascript engine.
 See the [quick](https://crates.io/crates/quickjs) crate for a high-level
 wrapper.
 
-**Embedded VERSION: 2019-09-01**
+**Embedded VERSION: 2019-09-18**
 
 ## Embedded vs system
 

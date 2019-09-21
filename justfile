@@ -1,6 +1,6 @@
 embed_dir := "./libquickjs-sys/embed/quickjs"
 
-DOWNLOAD_URL := "https://bellard.org/quickjs/quickjs-2019-09-01.tar.xz"
+DOWNLOAD_URL := "https://bellard.org/quickjs/quickjs-2019-09-18.tar.xz"
 FEATURES := ""
 
 download-new:

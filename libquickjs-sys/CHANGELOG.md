@@ -1,5 +1,12 @@
 # libquickjs_sys - Changelog
 
+## v0.4.0 - ??
+
+Upgraded to version `2019-09-18`.
+
+* Added `JS_ValueToAtom`
+* ...
+
 ## v0.3.0 - 2019-08-13
 
 * Added `patched` feature for applying patches
