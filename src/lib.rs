@@ -811,7 +811,7 @@ mod tests {
 
     #[cfg(feature = "num-bigint")]
     #[test]
-    fn test_bigint_serialize_64() {
+    fn test_bigint_serialize_i64() {
         for i in vec![0, std::i64::MAX, std::i64::MIN] {
             let c = Context::new().unwrap();
             c.eval(&format!(" function isEqual(x) {{ return x === {}n }} ", i))
@@ -836,12 +836,9 @@ mod tests {
             let c = Context::new().unwrap();
             c.eval(&format!(" function isEqual(x) {{ return x === {}n }} ", i))
                 .unwrap();
+            let value = JsValue::BigInt(num_bigint::BigInt::from(i).into());
             assert_eq!(
-                c.call_function(
-                    "isEqual",
-                    vec![JsValue::BigInt(num_bigint::BigInt::from(i).into())]
-                )
-                .unwrap(),
+                c.call_function("isEqual", vec![value]).unwrap(),
                 JsValue::Bool(true)
             );
         }
