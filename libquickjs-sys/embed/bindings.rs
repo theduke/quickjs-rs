@@ -2071,6 +2071,9 @@ extern "C" {
 extern "C" {
     pub fn JS_AtomToCString(ctx: *mut JSContext, atom: JSAtom) -> *const ::std::os::raw::c_char;
 }
+extern "C" {
+    pub fn JS_ValueToAtom(ctx: *mut JSContext, val: JSValue) -> JSAtom;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct JSPropertyEnum {
