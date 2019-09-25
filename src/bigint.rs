@@ -17,9 +17,11 @@ impl PartialEq for BigIntOrI64 {
     }
 }
 
+impl Eq for BigIntOrI64 {}
+
 /// A value holding JavaScript
 /// [BigInt](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) type
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BigInt {
     pub(crate) inner: BigIntOrI64,
 }
