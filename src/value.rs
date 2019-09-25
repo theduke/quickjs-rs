@@ -98,17 +98,15 @@ value_impl_from! {
 }
 
 #[cfg(feature = "bigint")]
-impl From<i64> for JsValue {
-    fn from(value: i64) -> Self {
-        JsValue::BigInt(value.into())
-    }
-}
-
-#[cfg(feature = "bigint")]
-impl From<num_bigint::BigInt> for JsValue {
-    fn from(value: num_bigint::BigInt) -> Self {
-        JsValue::BigInt(value.into())
-    }
+value_impl_from! {
+    ()
+    (
+        i64 => |x| x.into() => BigInt,
+        u64 => |x| num_bigint::BigInt::from(x).into() => BigInt,
+        i128 => |x| num_bigint::BigInt::from(x).into() => BigInt,
+        u128 => |x| num_bigint::BigInt::from(x).into() => BigInt,
+        num_bigint::BigInt => |x| x.into() => BigInt,
+    )
 }
 
 impl<T> From<Vec<T>> for JsValue
