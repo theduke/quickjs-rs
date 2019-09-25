@@ -493,9 +493,6 @@ fn deserialize_value(
                     inner: BigIntOrI64::Int(int),
                 }))
             } else {
-                if ret == -1 {
-                    return Err(ValueError::Internal("Internal BigInt error".into()));
-                }
                 let ptr = unsafe { q::JS_ToCStringLen2(context, std::ptr::null_mut(), *r, 0) };
 
                 if ptr.is_null() {
