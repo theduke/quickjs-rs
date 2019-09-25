@@ -7,7 +7,7 @@ use std::{
 
 use libquickjs_sys as q;
 
-#[cfg(feature = "num-bigint")]
+#[cfg(feature = "bigint")]
 use crate::bigint::{BigInt, BigIntOrI64};
 use crate::{
     callback::Callback, droppable_value::DroppableValue, ContextError, ExecutionError, JsValue,
@@ -16,7 +16,7 @@ use crate::{
 
 // JS_TAG_* constants from quickjs.
 // For some reason bindgen does not pick them up.
-#[cfg(feature = "num-bigint")]
+#[cfg(feature = "bigint")]
 const TAG_BIG_INT: i64 = -10;
 const TAG_STRING: i64 = -7;
 const TAG_OBJECT: i64 = -1;
@@ -63,7 +63,7 @@ fn js_date_constructor(context: *mut q::JSContext) -> q::JSValue {
     date_constructor
 }
 
-#[cfg(feature = "num-bigint")]
+#[cfg(feature = "bigint")]
 fn js_bigint_function(context: *mut q::JSContext) -> q::JSValue {
     let global = unsafe { q::JS_GetGlobalObject(context) };
     assert_eq!(global.tag, TAG_OBJECT);
@@ -229,10 +229,9 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
             }
             value
         }
-        #[cfg(feature = "num-bigint")]
+        #[cfg(feature = "bigint")]
         JsValue::BigInt(int) => match int.inner {
             BigIntOrI64::Int(int) => unsafe { q::JS_NewBigInt64(context, int) },
-            #[cfg(feature = "num-bigint")]
             BigIntOrI64::BigInt(bigint) => {
                 let bigint_string = bigint.to_str_radix(10);
                 let s = unsafe {
@@ -485,7 +484,7 @@ fn deserialize_value(
             }
         }
         // BigInt
-        #[cfg(feature = "num-bigint")]
+        #[cfg(feature = "bigint")]
         TAG_BIG_INT => {
             let mut int: i64 = 0;
             let ret = unsafe { q::JS_ToBigInt64(context, &mut int, *r) };
@@ -497,26 +496,23 @@ fn deserialize_value(
                 if ret == -1 {
                     return Err(ValueError::Internal("Internal BigInt error".into()));
                 }
-                #[cfg(feature = "num-bigint")]
-                {
-                    let ptr = unsafe { q::JS_ToCStringLen2(context, std::ptr::null_mut(), *r, 0) };
+                let ptr = unsafe { q::JS_ToCStringLen2(context, std::ptr::null_mut(), *r, 0) };
 
-                    if ptr.is_null() {
-                        return Err(ValueError::Internal(
-                            "Could not convert BigInt to string: got a null pointer".into(),
-                        ));
-                    }
-
-                    let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
-                    let bigint = num_bigint::BigInt::parse_bytes(cstr.to_bytes(), 10).unwrap();
-
-                    // Free the c string.
-                    unsafe { q::JS_FreeCString(context, ptr) };
-
-                    Ok(JsValue::BigInt(BigInt {
-                        inner: BigIntOrI64::BigInt(bigint),
-                    }))
+                if ptr.is_null() {
+                    return Err(ValueError::Internal(
+                        "Could not convert BigInt to string: got a null pointer".into(),
+                    ));
                 }
+
+                let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
+                let bigint = num_bigint::BigInt::parse_bytes(cstr.to_bytes(), 10).unwrap();
+
+                // Free the c string.
+                unsafe { q::JS_FreeCString(context, ptr) };
+
+                Ok(JsValue::BigInt(BigInt {
+                    inner: BigIntOrI64::BigInt(bigint),
+                }))
             }
         }
         x => Err(ValueError::Internal(format!(
@@ -1114,7 +1110,7 @@ mod tests {
     #[allow(unused_imports)]
     use super::*;
 
-    #[cfg(feature = "num-bigint")]
+    #[cfg(feature = "bigint")]
     #[test]
     fn test_bigint_as_i64() {
         let value = BigInt {
@@ -1123,7 +1119,7 @@ mod tests {
         assert_eq!(value.as_i64(), Some(1234i64));
     }
 
-    #[cfg(feature = "num-bigint")]
+    #[cfg(feature = "bigint")]
     #[test]
     fn test_bigint_as_i64_overflow() {
         let value = BigInt {
@@ -1132,7 +1128,7 @@ mod tests {
         assert_eq!(value.as_i64(), None);
     }
 
-    #[cfg(feature = "num-bigint")]
+    #[cfg(feature = "bigint")]
     #[test]
     fn test_bigint_into_bigint() {
         for i in vec![

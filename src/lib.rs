@@ -35,10 +35,7 @@
 #![deny(warnings)]
 #![deny(missing_docs)]
 
-#[cfg(feature = "num-bigint")]
-extern crate num_bigint_bare as num_bigint;
-
-#[cfg(feature = "num-bigint")]
+#[cfg(feature = "bigint")]
 mod bigint;
 mod bindings;
 mod callback;
@@ -47,7 +44,7 @@ mod value;
 
 use std::{convert::TryFrom, error, fmt};
 
-#[cfg(feature = "num-bigint")]
+#[cfg(feature = "bigint")]
 pub use bigint::BigInt;
 pub use callback::Callback;
 pub use value::*;
@@ -783,7 +780,7 @@ mod tests {
         assert_eq!(d.timestamp_millis(), d2.timestamp_millis());
     }
 
-    #[cfg(feature = "num-bigint")]
+    #[cfg(feature = "bigint")]
     #[test]
     fn test_bigint_deserialize_i64() {
         for i in vec![0, std::i64::MAX, std::i64::MIN] {
@@ -793,7 +790,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "num-bigint")]
+    #[cfg(feature = "bigint")]
     #[test]
     fn test_bigint_deserialize_bigint() {
         for i in vec![
@@ -809,7 +806,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "num-bigint")]
+    #[cfg(feature = "bigint")]
     #[test]
     fn test_bigint_serialize_i64() {
         for i in vec![0, std::i64::MAX, std::i64::MIN] {
@@ -824,7 +821,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "num-bigint")]
+    #[cfg(feature = "bigint")]
     #[test]
     fn test_bigint_serialize_bigint() {
         for i in vec![

@@ -13,8 +13,8 @@ keywords = ["quickjs", "javascript", "js", "engine", "interpreter"]
 [dependencies]
 libquickjs-sys = { version = "0.3.0", path = "./libquickjs-sys" }
 chrono = { version = "0.4.7", optional = true }
-num-bigint-bare = { package = "num-bigint", version = "0.2.2", optional = true }
-num-traits = { package = "num-traits", version = "0.2.0", optional = true }
+num-bigint = { version = "0.2.2", optional = true }
+num-traits = { version = "0.2.0", optional = true }
 
 [workspace]
 members = [
@@ -23,7 +23,7 @@ members = [
 
 [features]
 patched = ["libquickjs-sys/patched"]
-num-bigint = ["num-bigint-bare", "num-traits", "libquickjs-sys/bignum", "libquickjs-sys/patched"]
+bigint = ["num-bigint", "num-traits", "libquickjs-sys/bignum", "libquickjs-sys/patched"]
 
 [package.metadata.docs.rs]
-features = [ "chrono", "num-bigint" ]
+features = [ "chrono", "bigint" ]

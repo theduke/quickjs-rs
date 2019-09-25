@@ -1,14 +1,11 @@
-#[cfg(feature = "num-bigint")]
 use num_traits::cast::ToPrimitive;
 
-#[cfg(feature = "num-bigint")]
 #[derive(Clone, Debug)]
 pub enum BigIntOrI64 {
     Int(i64),
     BigInt(num_bigint::BigInt),
 }
 
-#[cfg(feature = "num-bigint")]
 impl PartialEq for BigIntOrI64 {
     fn eq(&self, other: &Self) -> bool {
         use BigIntOrI64::*;
@@ -22,13 +19,11 @@ impl PartialEq for BigIntOrI64 {
 
 /// A value holding JavaScript
 /// [BigInt](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) type
-#[cfg(feature = "num-bigint")]
 #[derive(Clone, Debug, PartialEq)]
 pub struct BigInt {
     pub(crate) inner: BigIntOrI64,
 }
 
-#[cfg(feature = "num-bigint")]
 impl BigInt {
     /// Return `Some` if value fits into `i64` and `None` otherwise
     pub fn as_i64(&self) -> Option<i64> {
@@ -46,7 +41,6 @@ impl BigInt {
     }
 }
 
-#[cfg(feature = "num-bigint")]
 impl From<i64> for BigInt {
     fn from(int: i64) -> Self {
         BigInt {
@@ -55,7 +49,6 @@ impl From<i64> for BigInt {
     }
 }
 
-#[cfg(feature = "num-bigint")]
 impl From<num_bigint::BigInt> for BigInt {
     fn from(bigint: num_bigint::BigInt) -> Self {
         BigInt {
