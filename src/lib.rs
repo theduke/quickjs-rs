@@ -421,6 +421,18 @@ mod tests {
 
         let value: String = c.eval_as("var x = 44; x.toString()").unwrap();
         assert_eq!(&value, "44");
+
+        #[cfg(feature = "bigint")]
+        assert_eq!(
+            c.eval_as::<num_bigint::BigInt>("1n << 100n").unwrap(),
+            num_bigint::BigInt::from(1i128 << 100)
+        );
+
+        #[cfg(feature = "bigint")]
+        assert_eq!(c.eval_as::<i64>("1 << 30").unwrap(), 1i64 << 30);
+
+        #[cfg(feature = "bigint")]
+        assert_eq!(c.eval_as::<u128>("1n << 100n").unwrap(), 1u128 << 100);
     }
 
     #[test]

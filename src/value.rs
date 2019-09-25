@@ -109,6 +109,67 @@ value_impl_from! {
     )
 }
 
+#[cfg(feature = "bigint")]
+impl std::convert::TryFrom<JsValue> for i64 {
+    type Error = ValueError;
+
+    fn try_from(value: JsValue) -> Result<Self, Self::Error> {
+        match value {
+            JsValue::Int(int) => Ok(int as i64),
+            JsValue::BigInt(bigint) => bigint.as_i64().ok_or(ValueError::UnexpectedType),
+            _ => Err(ValueError::UnexpectedType),
+        }
+    }
+}
+
+#[cfg(feature = "bigint")]
+macro_rules! value_bigint_impl_tryfrom {
+    (
+        ($($t:ty => $to_type:ident, )*)
+    ) => {
+        $(
+            impl std::convert::TryFrom<JsValue> for $t {
+                type Error = ValueError;
+
+                fn try_from(value: JsValue) -> Result<Self, Self::Error> {
+                    use num_traits::ToPrimitive;
+
+                    match value {
+                        JsValue::Int(int) => Ok(int as $t),
+                        JsValue::BigInt(bigint) => bigint
+                            .into_bigint()
+                            .$to_type()
+                            .ok_or(ValueError::UnexpectedType),
+                        _ => Err(ValueError::UnexpectedType),
+                    }
+                }
+            }
+        )*
+    }
+}
+
+#[cfg(feature = "bigint")]
+value_bigint_impl_tryfrom! {
+    (
+        u64 => to_u64,
+        i128 => to_i128,
+        u128 => to_u128,
+    )
+}
+
+#[cfg(feature = "bigint")]
+impl std::convert::TryFrom<JsValue> for num_bigint::BigInt {
+    type Error = ValueError;
+
+    fn try_from(value: JsValue) -> Result<Self, Self::Error> {
+        match value {
+            JsValue::Int(int) => Ok(num_bigint::BigInt::from(int)),
+            JsValue::BigInt(bigint) => Ok(bigint.into_bigint()),
+            _ => Err(ValueError::UnexpectedType),
+        }
+    }
+}
+
 impl<T> From<Vec<T>> for JsValue
 where
     T: Into<JsValue>,
