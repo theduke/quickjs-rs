@@ -64,7 +64,7 @@ fn js_date_constructor(context: *mut q::JSContext) -> q::JSValue {
 }
 
 #[cfg(feature = "bigint")]
-fn js_bigint_function(context: *mut q::JSContext) -> q::JSValue {
+fn js_create_bigint_function(context: *mut q::JSContext) -> q::JSValue {
     let global = unsafe { q::JS_GetGlobalObject(context) };
     assert_eq!(global.tag, TAG_OBJECT);
 
@@ -252,7 +252,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
 
                 let mut args = vec![*s];
 
-                let bigint_function = js_bigint_function(context);
+                let bigint_function = js_create_bigint_function(context);
                 let bigint_function =
                     DroppableValue::new(bigint_function, |&mut bigint_function| unsafe {
                         free_value(context, bigint_function);
