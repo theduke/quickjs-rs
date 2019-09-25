@@ -1,4 +1,10 @@
+#[cfg(feature = "bigint")]
+pub(crate) mod bigint;
+
 use std::{collections::HashMap, error, fmt};
+
+#[cfg(feature = "bigint")]
+pub use bigint::BigInt;
 
 /// A value that can be (de)serialized to/from the quickjs runtime.
 #[derive(PartialEq, Clone, Debug)]

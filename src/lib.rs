@@ -35,8 +35,6 @@
 #![deny(warnings)]
 #![deny(missing_docs)]
 
-#[cfg(feature = "bigint")]
-mod bigint;
 mod bindings;
 mod callback;
 mod droppable_value;
@@ -44,8 +42,6 @@ mod value;
 
 use std::{convert::TryFrom, error, fmt};
 
-#[cfg(feature = "bigint")]
-pub use bigint::BigInt;
 pub use callback::Callback;
 pub use value::*;
 

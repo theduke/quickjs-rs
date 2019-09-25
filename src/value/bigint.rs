@@ -58,3 +58,44 @@ impl From<num_bigint::BigInt> for BigInt {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[allow(unused_imports)]
+    use super::*;
+
+    #[cfg(feature = "bigint")]
+    #[test]
+    fn test_bigint_as_i64() {
+        let value = BigInt {
+            inner: BigIntOrI64::Int(1234i64),
+        };
+        assert_eq!(value.as_i64(), Some(1234i64));
+    }
+
+    #[cfg(feature = "bigint")]
+    #[test]
+    fn test_bigint_as_i64_overflow() {
+        let value = BigInt {
+            inner: BigIntOrI64::BigInt(num_bigint::BigInt::from(std::i128::MAX)),
+        };
+        assert_eq!(value.as_i64(), None);
+    }
+
+    #[cfg(feature = "bigint")]
+    #[test]
+    fn test_bigint_into_bigint() {
+        for i in vec![
+            0 as i128,
+            std::i64::MAX as i128,
+            std::i64::MIN as i128,
+            std::i128::MAX,
+            std::i128::MIN,
+        ] {
+            let value = BigInt {
+                inner: BigIntOrI64::BigInt(num_bigint::BigInt::from(i)),
+            };
+            assert_eq!(value.into_bigint(), num_bigint::BigInt::from(i));
+        }
+    }
+}
