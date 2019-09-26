@@ -61,6 +61,7 @@ The crate supports the following features:
 
 * `chrono`: adds chrono integration
     - adds a `JsValue::Date` variant that can be (de)serialized to/from a JS `Date`
+* `bigint`: arbitrary precision integer support via [num-bigint](https://github.com/rust-num/num-bigint)
 * `patched`: applies QuickJS patches that can be found in `libquickjs-sys/embed/patches` directory.
 
 ### System installation
