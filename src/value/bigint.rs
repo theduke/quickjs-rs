@@ -64,7 +64,6 @@ mod tests {
     #[allow(unused_imports)]
     use super::*;
 
-    #[cfg(feature = "bigint")]
     #[test]
     fn test_bigint_as_i64() {
         let value = BigInt {
@@ -73,7 +72,6 @@ mod tests {
         assert_eq!(value.as_i64(), Some(1234i64));
     }
 
-    #[cfg(feature = "bigint")]
     #[test]
     fn test_bigint_as_i64_overflow() {
         let value = BigInt {
@@ -82,7 +80,6 @@ mod tests {
         assert_eq!(value.as_i64(), None);
     }
 
-    #[cfg(feature = "bigint")]
     #[test]
     fn test_bigint_into_bigint() {
         for i in vec![
