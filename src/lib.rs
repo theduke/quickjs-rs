@@ -32,8 +32,7 @@
 //! "#).unwrap();
 //! ```
 
-#![deny(warnings)]
-#![deny(missing_docs)]
+#![cfg_attr(test, deny(warnings, missing_docs))]
 
 mod bindings;
 mod callback;
