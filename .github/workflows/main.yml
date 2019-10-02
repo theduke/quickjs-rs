@@ -59,4 +59,4 @@ jobs:
     
     - name: Check for leaks (Valgrind)
       run: $HOME/just valgrind
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.os == 'ubuntu-latest' && matrix.features == '--all-features'

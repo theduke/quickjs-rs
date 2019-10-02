@@ -38,6 +38,8 @@ lint:
 
     echo "Checking formatting..."
     cargo fmt -- --check
+    echo "Checking for docs and warnings"
+    RUSTFLAGS="-D warnings -D missing-docs" cargo check --all-features
     echo "Checking clippy..."
     cargo clippy
 
