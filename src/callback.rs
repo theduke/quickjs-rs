@@ -106,6 +106,7 @@ impl_callback![
 pub struct Arguments(Vec<JsValue>);
 
 impl Arguments {
+    /// Unpack the arguments into a Vec.
     pub fn into_vec(self) -> Vec<JsValue> {
         self.0
     }
