@@ -1,0 +1,62 @@
+name: Main
+
+on:
+  push:
+    branches:
+      - master
+  pull_request: {}
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }} with features ${{ matrix.features }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macOS-latest]
+        features: ["--no-default-features", "", "--all-features"]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v1
+
+
+    
+    - name: Setup (MacOS)
+      run: |
+        echo "Installing Rust"
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+
+        source $HOME/.cargo/env
+
+        echo "Installing just..."
+        curl -LSfs https://japaric.github.io/trust/install.sh | sh -s -- --git casey/just --to $HOME
+      if: matrix.os == 'macOS-latest'
+
+    - name: Setup (debian)
+      run: |
+        echo "Install just"
+        curl -LSfs https://japaric.github.io/trust/install.sh | sh -s -- --git casey/just --target x86_64-unknown-linux-musl --to $HOME
+        echo "Run setup"
+        sudo apt-get install -y curl xz-utils build-essential gcc-multilib valgrind
+      if: matrix.os == 'ubuntu-latest'
+
+    - name: Build
+      env:
+        FEATURES: ${{ matrix.features }}
+      run: |
+        source $HOME/.cargo/env
+        $HOME/just FEATURES="$FEATURES" build
+    
+    - name: Test
+      env:
+        FEATURES: ${{ matrix.features }}
+      run: |
+        source $HOME/.cargo/env
+        $HOME/just FEATURES="$FEATURES" test
+    
+    - name: Lint
+      run: $HOME/just lint
+      if: matrix.os == 'ubuntu-latest'
+    
+    - name: Check for leaks (Valgrind)
+      run: $HOME/just valgrind
+      if: matrix.os == 'ubuntu-latest' && matrix.features == '--all-features'
