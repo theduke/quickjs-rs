@@ -42,12 +42,16 @@ jobs:
     - name: Build
       env:
         FEATURES: ${{ matrix.features }}
-      run: $HOME/just FEATURES="$FEATURES" build
+      run: |
+        source $HOME/.cargo/env
+        $HOME/just FEATURES="$FEATURES" build
     
     - name: Test
       env:
         FEATURES: ${{ matrix.features }}
-      run: $HOME/just FEATURES="$FEATURES" test
+      run: |
+        source $HOME/.cargo/env
+        $HOME/just FEATURES="$FEATURES" test
     
     - name: Lint
       run: $HOME/just lint
