@@ -23,7 +23,7 @@ update-quickjs: download-new generate-bindings download-cleanup
 
 debian-setup:
     echo "Installing dependencies..."
-    sudo apt update && sudo apt-get install -y curl xz-utils build-essential gcc-multilib valgrind
+    sudo apt update && sudo apt-get install -y curl xz-utils build-essential gcc-multilib libclang-dev clang valgrind
 
 build:
     cargo build --verbose {{FEATURES}}
