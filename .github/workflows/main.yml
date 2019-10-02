@@ -1,0 +1,44 @@
+name: Main
+
+on:
+  push:
+    branches:
+      - master
+  pull_request: {}
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }} with features ${{ matrix.features }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macOS-latest]
+        features: ["--no-default-features", "", "--all-features"]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v1
+    
+    - name: Install just
+      run: cargo install -f --debug just
+      
+    - name: Setup (debian)
+      run: $HOME/.cargo/bin/just debian-setup
+      if: matrix.os == 'ubuntu-latest'
+
+    - name: Build
+      env:
+        FEATURES: ${{ matrix.features }}
+      run: $HOME/.cargo/bin/just FEATURES="$FEATURES" build
+    
+    - name: Test
+      env:
+        FEATURES: ${{ matrix.features }}
+      run: $HOME/.cargo/bin/just FEATURES="$FEATURES" test
+    
+    - name: Lint
+      run: $HOME/.cargo/bin/just lint
+      if: matrix.os == 'ubuntu-latest'
+    
+    - name: Check for leaks (Valgrind)
+      run: $HOME/.cargo/bin/just valgrind
+      if: matrix.os == 'ubuntu-latest'

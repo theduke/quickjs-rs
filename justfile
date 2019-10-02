@@ -1,7 +1,7 @@
 embed_dir := "./libquickjs-sys/embed/quickjs"
 
 DOWNLOAD_URL := "https://bellard.org/quickjs/quickjs-2019-09-18.tar.xz"
-FEATURES := ""
+FEATURES := "--all-features"
 
 download-new:
     test -d {{embed_dir}} && rm -r {{embed_dir}} || echo ""
@@ -20,30 +20,28 @@ generate-bindings:
 
 update-quickjs: download-new generate-bindings download-cleanup
 
-ci-debian-setup:
+
+debian-setup:
     echo "Installing dependencies..."
     apt update && apt-get install -y curl xz-utils build-essential gcc-multilib libclang-dev clang valgrind
 
-ci-test:
-    # Limit test threads to 1 to show test name before execution.
-    RUST_TEST_THREADS=1 cargo test --verbose --features="{{FEATURES}}"
+build:
+    cargo build --verbose {{FEATURES}}
 
-ci-lint:
-    rustup component add rustfmt clippy
+test:
+    # Limit test threads to 1 to show test name before execution.
+    RUST_TEST_THREADS=1 cargo test --verbose {{FEATURES}}
+
+lint:
     echo "Linting!"
+    rustup component add rustfmt clippy
 
     echo "Checking formatting..."
     cargo fmt -- --check
     echo "Checking clippy..."
     cargo clippy
 
-ci-valgrind:
+valgrind:
     echo "Checking for memory leaks..."
     find target/debug -maxdepth 1 -type f -executable | xargs valgrind --leak-check=full --error-exitcode=1
 
-ci-debian: ci-debian-setup ci-test ci-lint ci-valgrind
-
-ci-macos-setup:
-    echo "setup"
-
-ci-macos: ci-macos-setup ci-test
