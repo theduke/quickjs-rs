@@ -99,6 +99,47 @@ impl_callback![
     5: (A1, A2, A3, A4, A5,),
 ];
 
+/// A wrapper around Vec<JsValue>, used for vararg callbacks.
+///
+/// To create a callback with a variable number of arguments, a callback closure
+/// must take a single `Arguments` argument.
+pub struct Arguments(Vec<JsValue>);
+
+impl Arguments {
+    pub fn into_vec(self) -> Vec<JsValue> {
+        self.0
+    }
+}
+
+impl<F> Callback<PhantomData<(&Arguments, &F)>> for F
+where
+    F: Fn(Arguments) + Sized + RefUnwindSafe,
+{
+    fn argument_count(&self) -> usize {
+        0
+    }
+
+    fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
+        (self)(Arguments(args));
+        Ok(Ok(JsValue::Null))
+    }
+}
+
+impl<F, R> Callback<PhantomData<(&Arguments, &F, &R)>> for F
+where
+    R: IntoCallbackResult,
+    F: Fn(Arguments) -> R + Sized + RefUnwindSafe,
+{
+    fn argument_count(&self) -> usize {
+        0
+    }
+
+    fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
+        let res = (self)(Arguments(args));
+        Ok(res.into_callback_res())
+    }
+}
+
 // Implement Callback for Fn() -> R functions.
 //impl<R, F> Callback<PhantomData<(&R, &F)>> for F
 //where

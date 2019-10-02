@@ -41,7 +41,7 @@ mod value;
 
 use std::{convert::TryFrom, error, fmt};
 
-pub use callback::Callback;
+pub use callback::{Arguments, Callback};
 pub use value::*;
 
 /// Error on Javascript execution.
@@ -662,6 +662,46 @@ mod tests {
         callback_argn_tests![
             1: (a : 1),
         ]
+    }
+
+    #[test]
+    fn test_callback_varargs() {
+        let c = Context::new().unwrap();
+
+        // No return.
+        c.add_callback("cb", |args: Arguments| {
+            let args = args.into_vec();
+            assert_eq!(
+                args,
+                vec![
+                    JsValue::String("hello".into()),
+                    JsValue::Bool(true),
+                    JsValue::from(100),
+                ]
+            );
+        })
+        .unwrap();
+        c.eval(" cb('hello', true, 100) ").unwrap();
+
+        // With return.
+        c.add_callback("cb2", |args: Arguments| -> u32 {
+            let args = args.into_vec();
+            assert_eq!(
+                args,
+                vec![JsValue::from(1), JsValue::from(10), JsValue::from(100),]
+            );
+            111
+        })
+        .unwrap();
+        c.eval(
+            r#"
+           var x = cb2(1, 10, 100);
+           if (x !== 111) {
+            throw new Error('Expected 111, got ' + x);
+           }
+       "#,
+        )
+        .unwrap();
     }
 
     #[test]
