@@ -10,8 +10,10 @@ use libquickjs_sys as q;
 #[cfg(feature = "bigint")]
 use crate::value::{bigint::BigIntOrI64, BigInt};
 use crate::{
-    callback::Callback, droppable_value::DroppableValue, ContextError, ExecutionError, JsValue,
-    ValueError,
+    callback::{Arguments, Callback},
+    console::ConsoleBackend,
+    droppable_value::DroppableValue,
+    ContextError, ExecutionError, JsValue, ValueError,
 };
 
 // JS_TAG_* constants from quickjs.
@@ -541,8 +543,6 @@ type WrappedCallback = dyn Fn(c_int, *mut q::JSValue) -> q::JSValue;
 ///
 /// Both the boxed closure and the boxed data are returned and must be stored
 /// by the caller to guarantee they stay alive.
-///
-/// TODO: use catch_unwind to prevent pancis.
 unsafe fn build_closure_trampoline<F>(
     closure: F,
 ) -> ((Box<WrappedCallback>, Box<q::JSValue>), q::JSCFunctionData)
@@ -759,6 +759,25 @@ impl<'a> OwnedObjectRef<'a> {
     // }
 }
 
+/*
+type ModuleInit = dyn Fn(*mut q::JSContext, *mut q::JSModuleDef);
+
+thread_local! {
+    static NATIVE_MODULE_INIT: RefCell<Option<Box<ModuleInit>>> = RefCell::new(None);
+}
+
+unsafe extern "C" fn native_module_init(
+    ctx: *mut q::JSContext,
+    m: *mut q::JSModuleDef,
+) -> ::std::os::raw::c_int {
+    NATIVE_MODULE_INIT.with(|init| {
+        let init = init.replace(None).unwrap();
+        init(ctx, m);
+    });
+    0
+}
+*/
+
 /// Wraps a quickjs context.
 ///
 /// Cleanup of the context happens in drop.
@@ -813,6 +832,60 @@ impl ContextWrapper {
         };
 
         Ok(wrapper)
+    }
+
+    // See console standard: https://console.spec.whatwg.org
+    pub fn set_console(&self, backend: Box<dyn ConsoleBackend>) -> Result<(), ExecutionError> {
+        use crate::console::Level;
+
+        self.add_callback("__console_write", move |args: Arguments| {
+            let mut args = args.into_vec();
+
+            if args.len() > 1 {
+                let level_raw = args.remove(0);
+
+                let level_opt = level_raw.as_str().and_then(|v| match v {
+                    "trace" => Some(Level::Trace),
+                    "debug" => Some(Level::Debug),
+                    "log" => Some(Level::Log),
+                    "info" => Some(Level::Info),
+                    "warn" => Some(Level::Warn),
+                    "error" => Some(Level::Error),
+                    _ => None,
+                });
+
+                if let Some(level) = level_opt {
+                    backend.log(level, args);
+                }
+            }
+        })?;
+
+        self.eval(
+            r#"
+            globalThis.console = {
+                trace: (...args) => {
+                    globalThis.__console_write("trace", ...args);
+                },
+                debug: (...args) => {
+                    globalThis.__console_write("debug", ...args);
+                },
+                log: (...args) => {
+                    globalThis.__console_write("log", ...args);
+                },
+                info: (...args) => {
+                    globalThis.__console_write("info", ...args);
+                },
+                warn: (...args) => {
+                    globalThis.__console_write("warn", ...args);
+                },
+                error: (...args) => {
+                    globalThis.__console_write("error", ...args);
+                },
+            };
+        "#,
+        )?;
+
+        Ok(())
     }
 
     /// Reset the wrapper by creating a new context.
@@ -1056,11 +1129,10 @@ impl ContextWrapper {
     }
 
     /// Add a global JS function that is backed by a Rust function or closure.
-    pub fn add_callback<'a, F>(
+    pub fn create_callback<'a, F>(
         &'a self,
-        name: &str,
         callback: impl Callback<F> + 'static,
-    ) -> Result<(), ExecutionError> {
+    ) -> Result<q::JSValue, ExecutionError> {
         let argcount = callback.argument_count() as i32;
 
         let context = self.context;
@@ -1096,11 +1168,19 @@ impl ContextWrapper {
             return Err(ExecutionError::Internal("Could not create callback".into()));
         }
 
+        Ok(cfunc)
+    }
+
+    pub fn add_callback<'a, F>(
+        &'a self,
+        name: &str,
+        callback: impl Callback<F> + 'static,
+    ) -> Result<(), ExecutionError> {
+        let cfunc = self.create_callback(callback)?;
         let global = self.global()?;
         unsafe {
             global.set_property_raw(name, cfunc)?;
         }
-
         Ok(())
     }
 }

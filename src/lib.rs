@@ -32,16 +32,17 @@
 //! "#).unwrap();
 //! ```
 
-#![cfg_attr(test, deny(warnings, missing_docs))]
+#![deny(missing_docs)]
 
 mod bindings;
 mod callback;
+pub mod console;
 mod droppable_value;
 mod value;
 
 use std::{convert::TryFrom, error, fmt};
 
-pub use callback::Callback;
+pub use callback::{Arguments, Callback};
 pub use value::*;
 
 /// Error on Javascript execution.
@@ -90,6 +91,8 @@ pub enum ContextError {
     RuntimeCreationFailed,
     /// Context could not be created.
     ContextCreationFailed,
+    /// Execution error while building.
+    Execution(ExecutionError),
     #[doc(hidden)]
     __NonExhaustive,
 }
@@ -100,6 +103,7 @@ impl fmt::Display for ContextError {
         match self {
             RuntimeCreationFailed => write!(f, "Could not create runtime"),
             ContextCreationFailed => write!(f, "Could not create context"),
+            Execution(e) => e.fmt(f),
             __NonExhaustive => unreachable!(),
         }
     }
@@ -112,11 +116,15 @@ impl error::Error for ContextError {}
 /// Create with [Context::builder](Context::builder).
 pub struct ContextBuilder {
     memory_limit: Option<usize>,
+    console_backend: Option<Box<dyn console::ConsoleBackend>>,
 }
 
 impl ContextBuilder {
     fn new() -> Self {
-        Self { memory_limit: None }
+        Self {
+            memory_limit: None,
+            console_backend: None,
+        }
     }
 
     /// Sets the memory limit of the Javascript runtime (in bytes).
@@ -130,9 +138,26 @@ impl ContextBuilder {
         s
     }
 
+    /// Set a console handler that will proxy `console.{log,trace,debug,...}`
+    /// calls.
+    ///
+    /// The given argument must implement the [ConsoleBackend] trait.
+    ///
+    /// A very simple logger could look like this:
+    pub fn console<B>(mut self, backend: B) -> Self
+    where
+        B: console::ConsoleBackend,
+    {
+        self.console_backend = Some(Box::new(backend));
+        self
+    }
+
     /// Finalize the builder and build a JS Context.
     pub fn build(self) -> Result<Context, ContextError> {
         let wrapper = bindings::ContextWrapper::new(self.memory_limit)?;
+        if let Some(be) = self.console_backend {
+            wrapper.set_console(be).map_err(ContextError::Execution)?;
+        }
         Ok(Context::from_wrapper(wrapper))
     }
 }
@@ -665,6 +690,46 @@ mod tests {
     }
 
     #[test]
+    fn test_callback_varargs() {
+        let c = Context::new().unwrap();
+
+        // No return.
+        c.add_callback("cb", |args: Arguments| {
+            let args = args.into_vec();
+            assert_eq!(
+                args,
+                vec![
+                    JsValue::String("hello".into()),
+                    JsValue::Bool(true),
+                    JsValue::from(100),
+                ]
+            );
+        })
+        .unwrap();
+        c.eval(" cb('hello', true, 100) ").unwrap();
+
+        // With return.
+        c.add_callback("cb2", |args: Arguments| -> u32 {
+            let args = args.into_vec();
+            assert_eq!(
+                args,
+                vec![JsValue::from(1), JsValue::from(10), JsValue::from(100),]
+            );
+            111
+        })
+        .unwrap();
+        c.eval(
+            r#"
+           var x = cb2(1, 10, 100);
+           if (x !== 111) {
+            throw new Error('Expected 111, got ' + x);
+           }
+       "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
     fn test_callback_invalid_argcount() {
         let c = Context::new().unwrap();
 
@@ -846,5 +911,39 @@ mod tests {
                 JsValue::Bool(true)
             );
         }
+    }
+
+    #[test]
+    fn test_console() {
+        use console::Level;
+        use std::sync::{Arc, Mutex};
+
+        let messages = Arc::new(Mutex::new(Vec::<(Level, Vec<JsValue>)>::new()));
+
+        let m = messages.clone();
+        let c = Context::builder()
+            .console(move |level: Level, args: Vec<JsValue>| {
+                m.lock().unwrap().push((level, args));
+            })
+            .build()
+            .unwrap();
+
+        c.eval(
+            r#"
+            console.log("hi");
+            console.error(false);
+        "#,
+        )
+        .unwrap();
+
+        let m = messages.lock().unwrap();
+
+        assert_eq!(
+            *m,
+            vec![
+                (Level::Log, vec![JsValue::from("hi")]),
+                (Level::Error, vec![JsValue::from(false)]),
+            ]
+        );
     }
 }
