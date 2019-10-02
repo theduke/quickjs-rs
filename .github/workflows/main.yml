@@ -17,14 +17,24 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
+
+
     
-    - name: Install just
+    - name: Setup (MacOS)
       run: |
-        curl -LSfs https://japaric.github.io/trust/install.sh | sh -s -- --git casey/just --target x86_64-unknown-linux-musl --to $HOME
-      if: matrix.os == 'ubuntu-latest'
+        echo "Installing Rust"
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+
+        echo "Installing just..."
+        curl -LSfs https://japaric.github.io/trust/install.sh | sh -s -- --git casey/just --to $HOME
+      if: matrix.os == 'macOS-latest'
 
     - name: Setup (debian)
-      run: $HOME/just debian-setup
+      run: |
+        echo "Install just"
+        curl -LSfs https://japaric.github.io/trust/install.sh | sh -s -- --git casey/just --target x86_64-unknown-linux-musl --to $HOME
+        echo "Run setup"
+        $HOME/just debian-setup
       if: matrix.os == 'ubuntu-latest'
 
     - name: Build
