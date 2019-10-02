@@ -543,8 +543,6 @@ type WrappedCallback = dyn Fn(c_int, *mut q::JSValue) -> q::JSValue;
 ///
 /// Both the boxed closure and the boxed data are returned and must be stored
 /// by the caller to guarantee they stay alive.
-///
-/// TODO: use catch_unwind to prevent pancis.
 unsafe fn build_closure_trampoline<F>(
     closure: F,
 ) -> ((Box<WrappedCallback>, Box<q::JSValue>), q::JSCFunctionData)
@@ -839,10 +837,6 @@ impl ContextWrapper {
     // See console standard: https://console.spec.whatwg.org
     pub fn set_console(&self, backend: Box<dyn ConsoleBackend>) -> Result<(), ExecutionError> {
         use crate::console::Level;
-
-        // TODO: can we prevent the Arc boxing here?
-        // Alternative solution would be to just have one private callback that
-        // also takes the level, and other JS functions that use it.
 
         self.add_callback("__console_write", move |args: Arguments| {
             let mut args = args.into_vec();
