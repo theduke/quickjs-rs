@@ -24,23 +24,23 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
 
     - name: Setup (debian)
-      run: $HOME/.cargo/bin/just debian-setup
+      run: $HOME/just debian-setup
       if: matrix.os == 'ubuntu-latest'
 
     - name: Build
       env:
         FEATURES: ${{ matrix.features }}
-      run: $HOME/.cargo/bin/just FEATURES="$FEATURES" build
+      run: $HOME/just FEATURES="$FEATURES" build
     
     - name: Test
       env:
         FEATURES: ${{ matrix.features }}
-      run: $HOME/.cargo/bin/just FEATURES="$FEATURES" test
+      run: $HOME/just FEATURES="$FEATURES" test
     
     - name: Lint
-      run: $HOME/.cargo/bin/just lint
+      run: $HOME/just lint
       if: matrix.os == 'ubuntu-latest'
     
     - name: Check for leaks (Valgrind)
-      run: $HOME/.cargo/bin/just valgrind
+      run: $HOME/just valgrind
       if: matrix.os == 'ubuntu-latest'
