@@ -125,7 +125,7 @@ mod log {
                 .into_iter()
                 .map(print_value)
                 .collect::<Vec<_>>()
-                .join(", ");
+                .join(" ");
 
             log::log!(log_level, "{}", msg);
         }
