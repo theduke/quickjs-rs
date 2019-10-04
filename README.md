@@ -63,7 +63,7 @@ The crate supports the following features:
 * `bigint`: arbitrary precision integer support via [num-bigint](https://github.com/rust-num/num-bigint)
 * `patched`: applies QuickJS patches that can be found in `libquickjs-sys/embed/patches` directory.
 * `log`: allows forwarding `console.log` messages to the `log` crate.
-    Note: must be enabled with `ContextBuilder::console(quickjs::console::LogConsole);`
+    Note: must be enabled with `ContextBuilder::console(quick_js::console::LogConsole);`
 
 ### System installation
 
