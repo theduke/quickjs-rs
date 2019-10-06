@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     ffi::CString,
-    os::raw::{c_int, c_void},
+    os::raw::{c_char, c_int, c_void},
     sync::Mutex,
 };
 
@@ -106,7 +106,8 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
             tag: TAG_FLOAT64,
         },
         JsValue::String(val) => {
-            let qval = unsafe { q::JS_NewStringLen(context, val.as_ptr() as *const i8, val.len()) };
+            let qval =
+                unsafe { q::JS_NewStringLen(context, val.as_ptr() as *const c_char, val.len()) };
 
             if qval.tag == TAG_EXCEPTION {
                 return Err(ValueError::Internal(
@@ -239,7 +240,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                 let s = unsafe {
                     q::JS_NewStringLen(
                         context,
-                        bigint_string.as_ptr() as *const i8,
+                        bigint_string.as_ptr() as *const c_char,
                         bigint_string.len(),
                     )
                 };
