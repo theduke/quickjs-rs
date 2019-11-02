@@ -2,16 +2,29 @@
 
 ## Master branch
 
-## v0.2.3 - 2018-08-30
+## v0.3.0 - 2019-11-02
+
+### Features
+
+* Add BigInt integration 
+* Add logging system and optional `log` crate integration
+* Upgrade quickjs to 2019-10-27
+
+### Breaking Changes
+
+* Made `Value` enum non-exhaustive
+* new Value::BigInt variant (with `bigint` feature)
+
+## v0.2.3 - 2019-08-30
 
 * Properly free property keys after enumeration
     (Fixes memory leak when deserializing objects)
 
-## v0.2.2 - 2018-08-13
+## v0.2.2 - 2019-08-13
 
 * Fix invalid millisecond conversion for JsValue::Date
 
-## v0.2.1 - 2018-08-13
+## v0.2.1 - 2019-08-13
 
 * Impelemented deserializiation of objects to `JsValue::Object`
 * Added `chrono` integration via the `chrono` feature
