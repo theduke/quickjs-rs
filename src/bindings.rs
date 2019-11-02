@@ -279,6 +279,9 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                 js_bigint
             }
         },
+        JsValue::__NonExhaustive => {
+            unreachable!()
+        }
     };
     Ok(v)
 }

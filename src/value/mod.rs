@@ -25,6 +25,8 @@ pub enum JsValue {
     /// Only available with the optional `bigint` feature
     #[cfg(feature = "bigint")]
     BigInt(crate::BigInt),
+    #[doc(hidden)]
+    __NonExhaustive,
 }
 
 impl JsValue {
