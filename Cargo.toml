@@ -2,7 +2,7 @@
 edition = "2018"
 name = "quick-js"
 description = "QuickJS Javascript engine wrapper"
-version = "0.2.3"
+version = "0.3.0"
 readme = "README.md"
 documentation = "https://docs.rs/quick-js"
 repository = "https://github.com/theduke/quickjs-rs"
@@ -10,8 +10,15 @@ license = "MIT"
 authors = ["Christoph Herzog <chris@theduke.at>"]
 keywords = ["quickjs", "javascript", "js", "engine", "interpreter"]
 
+[package.metadata.docs.rs]
+features = [ "chrono", "bigint", "log" ]
+
+[features]
+patched = ["libquickjs-sys/patched"]
+bigint = ["num-bigint", "num-traits", "libquickjs-sys/bignum", "libquickjs-sys/patched"]
+
 [dependencies]
-libquickjs-sys = { version = "0.3.0", path = "./libquickjs-sys" }
+libquickjs-sys = { version = "0.4.0", path = "./libquickjs-sys" }
 chrono = { version = "0.4.7", optional = true }
 num-bigint = { version = "0.2.2", optional = true }
 num-traits = { version = "0.2.0", optional = true }
@@ -23,9 +30,3 @@ members = [
     "libquickjs-sys",
 ]
 
-[features]
-patched = ["libquickjs-sys/patched"]
-bigint = ["num-bigint", "num-traits", "libquickjs-sys/bignum", "libquickjs-sys/patched"]
-
-[package.metadata.docs.rs]
-features = [ "chrono", "bigint" ]
