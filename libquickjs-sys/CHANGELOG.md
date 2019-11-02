@@ -1,11 +1,14 @@
 # libquickjs_sys - Changelog
 
-## v0.4.0 - ??
+## v0.4.0 - 2019-11-02
 
-Upgraded to version `2019-09-18`.
+Upgraded to version `2019-09-18`:
 
 * Added `JS_ValueToAtom`
-* ...
+* Added `JS_SetConstructor`
+* `JS_GetTypedArrayBuffer`
+
+Updated bindgen dependency to 0.51.
 
 ## v0.3.0 - 2019-08-13
 

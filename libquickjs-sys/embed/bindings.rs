@@ -27,7 +27,7 @@ pub const __STDC_IEC_559_COMPLEX__: u32 = 1;
 pub const __STDC_ISO_10646__: u32 = 201706;
 pub const __GNU_LIBRARY__: u32 = 6;
 pub const __GLIBC__: u32 = 2;
-pub const __GLIBC_MINOR__: u32 = 29;
+pub const __GLIBC_MINOR__: u32 = 30;
 pub const _SYS_CDEFS_H: u32 = 1;
 pub const __glibc_c99_flexarr_available: u32 = 1;
 pub const __WORDSIZE: u32 = 64;
@@ -2849,6 +2849,15 @@ extern "C" {
     pub fn JS_GetArrayBuffer(ctx: *mut JSContext, psize: *mut usize, obj: JSValue) -> *mut u8;
 }
 extern "C" {
+    pub fn JS_GetTypedArrayBuffer(
+        ctx: *mut JSContext,
+        obj: JSValue,
+        pbyte_offset: *mut usize,
+        pbyte_length: *mut usize,
+        pbytes_per_element: *mut usize,
+    ) -> JSValue;
+}
+extern "C" {
     pub fn JS_NewPromiseCapability(ctx: *mut JSContext, resolving_funcs: *mut JSValue) -> JSValue;
 }
 pub type JSInterruptHandler = ::std::option::Option<
@@ -3173,6 +3182,9 @@ extern "C" {
         data_len: ::std::os::raw::c_int,
         data: *mut JSValue,
     ) -> JSValue;
+}
+extern "C" {
+    pub fn JS_SetConstructor(ctx: *mut JSContext, func_obj: JSValue, proto: JSValue);
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
