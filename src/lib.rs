@@ -36,13 +36,17 @@
 
 mod bindings;
 mod callback;
+mod modules;
 pub mod console;
-mod droppable_value;
+mod owned_value_ref;
+mod timers;
+mod utils;
 mod value;
 
 use std::{convert::TryFrom, error, fmt};
 
 pub use callback::{Arguments, Callback};
+use std::path::Path;
 pub use value::*;
 
 /// Error on Javascript execution.
@@ -115,6 +119,7 @@ impl error::Error for ContextError {}
 ///
 /// Create with [Context::builder](Context::builder).
 pub struct ContextBuilder {
+    enable_timer_api: bool,
     memory_limit: Option<usize>,
     console_backend: Option<Box<dyn console::ConsoleBackend>>,
 }
@@ -122,9 +127,17 @@ pub struct ContextBuilder {
 impl ContextBuilder {
     fn new() -> Self {
         Self {
+            enable_timer_api: false,
             memory_limit: None,
             console_backend: None,
         }
+    }
+
+    /// Enables the Timer API: setTimeout, clearTimeout
+    pub fn enable_timer_api(self) -> Self {
+        let mut s = self;
+        s.enable_timer_api = true;
+        s
     }
 
     /// Sets the memory limit of the Javascript runtime (in bytes).
@@ -157,6 +170,11 @@ impl ContextBuilder {
         let wrapper = bindings::ContextWrapper::new(self.memory_limit)?;
         if let Some(be) = self.console_backend {
             wrapper.set_console(be).map_err(ContextError::Execution)?;
+        }
+        if self.enable_timer_api {
+            wrapper
+                .enable_timer_api()
+                .map_err(ContextError::Execution)?;
         }
         Ok(Context::from_wrapper(wrapper))
     }
@@ -236,9 +254,33 @@ impl Context {
     /// );
     /// ```
     pub fn eval(&self, code: &str) -> Result<JsValue, ExecutionError> {
-        let value_raw = self.wrapper.eval(code)?;
+        let value_raw = self.wrapper.eval(code, false, false)?;
         let value = value_raw.to_value()?;
         Ok(value)
+    }
+
+    /// QuickJS error reporting includes a script filename.
+    /// Set the file name to be reported here.
+    pub fn set_filename_hint(&mut self, filename: String) {
+        self.wrapper.set_filename_hint(filename);
+    }
+
+    /// Compile
+    pub fn compile(&self, code: &str, is_module: bool) -> Result<Vec<u8>, ExecutionError> {
+        let value_raw = self.wrapper.eval(code, true, is_module)?;
+        self.wrapper.value_to_bytecode(value_raw)
+    }
+
+    /// Run compiled byte code
+    pub fn run_bytecode(&self, code: &[u8]) -> Result<JsValue, ExecutionError> {
+        let value_raw = self.wrapper.run_bytecode(code)?;
+        let value = value_raw.to_value()?;
+        Ok(value)
+    }
+
+    /// Set the module loader to use the given path for loading modules.
+    pub fn set_module_loader_with_path(&mut self, path: &Path) {
+        self.wrapper.set_module_loader_with_path(path)
     }
 
     /// Evaluates Javascript code and returns the value of the final expression
@@ -251,7 +293,7 @@ impl Context {
     /// promise failed.
     ///
     /// ```rust
-    /// use quick_js::{Context};
+    /// use quick_js::Context;
     /// let context = Context::new().unwrap();
     ///
     /// let res = context.eval_as::<bool>(" 100 > 10 ");
@@ -271,7 +313,7 @@ impl Context {
         R: TryFrom<JsValue>,
         R::Error: Into<ValueError>,
     {
-        let value_raw = self.wrapper.eval(code)?;
+        let value_raw = self.wrapper.eval(code, false, false)?;
         let value = value_raw.to_value()?;
         let ret = R::try_from(value).map_err(|e| e.into())?;
         Ok(ret)
@@ -315,7 +357,10 @@ impl Context {
             )));
         }
 
-        let value = self.wrapper.call_function(func_obj, qargs)?.to_value()?;
+        let value = self
+            .wrapper
+            .call_function(func_obj, qargs, true)?
+            .to_value()?;
         Ok(value)
     }
 
@@ -482,7 +527,7 @@ mod tests {
                 f();
             "#
             ),
-            Err(ExecutionError::Exception("Error: My Error".into(),))
+            Err(ExecutionError::Exception("Error: My Error".into()))
         );
     }
 

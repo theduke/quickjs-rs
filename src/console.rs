@@ -104,6 +104,7 @@ mod log {
             JsValue::Date(v) => v.to_string(),
             #[cfg(feature = "bigint")]
             JsValue::BigInt(v) => v.to_string(),
+            _ => String::new(),
         }
     }
 
