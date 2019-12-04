@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use std::env;
+use std::{env, fs};
+
+use regex::Regex;
 
 fn exists(path: impl AsRef<Path>) -> bool {
     PathBuf::from(path.as_ref()).exists()
@@ -70,6 +72,7 @@ fn main() {
     apply_patches(&code_dir);
 
     eprintln!("Compiling quickjs...");
+    patch_makefile(code_dir.join("Makefile").as_path());
     std::process::Command::new("make")
         .arg(format!("lib{}.a", LIB_NAME))
         .current_dir(&code_dir)
@@ -78,15 +81,39 @@ fn main() {
         .wait()
         .expect("Could not compile quickjs");
 
-    std::fs::copy("./embed/bindings.rs", out_path.join("bindings.rs"))
-        .expect("Could not copy bindings.rs");
-
     // Instruct cargo to statically link quickjs.
     println!(
         "cargo:rustc-link-search=native={}",
         code_dir.to_str().unwrap()
     );
     println!("cargo:rustc-link-lib=static={}", LIB_NAME);
+}
+
+fn patch_makefile(makefile: &Path) {
+    let content = fs::read_to_string(makefile).unwrap();
+
+    let content = if cfg!(feature = "debug") {
+        Regex::new("CFLAGS_OPT=(.*) -O2")
+            .unwrap()
+            .replace_all(&content, "CFLAGS_OPT=$1 -O0 -g")
+    } else {
+        content.into()
+    };
+
+    let content = Regex::new("CROSS_PREFIX=")
+        .unwrap()
+        .replace_all(&content, "CROSS_PREFIX?=");
+
+    let content = if cfg!(feature = "pic") {
+        content
+            .replace("CFLAGS+=$(DEFINES)\n", "CFLAGS+=$(DEFINES) -fPIC\n")
+            .into()
+    } else {
+        content
+    };
+
+    fs::rename(makefile, makefile.with_extension("bak")).unwrap();
+    fs::write(makefile, content.as_bytes()).unwrap();
 }
 
 #[cfg(feature = "patched")]

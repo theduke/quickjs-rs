@@ -14,7 +14,7 @@ download-cleanup:
     find "{{embed_dir}}" -type f | grep test | xargs rm
 
 generate-bindings:
-    (cd libquickjs-sys; bindgen wrapper.h -o embed/bindings.rs -- -I ./embed)
+    (cd libquickjs-sys; bindgen wrapper.h -o src/bindings.rs -- -I ./embed)
     # Update VERSION in README
     sed -i "s/**Embedded VERSION: .*/**Embedded VERSION: $(cat ./libquickjs-sys/embed/quickjs/VERSION)**/" ./libquickjs-sys/README.md
 

@@ -25,7 +25,7 @@ QuickJS sources and a pre-generated `bindings.rs` are included in the repo.
 
 They are used if the `embedded` feature is enabled.
 
-To updat the bindings, follow these steps:
+To update the bindings, follow these steps:
 
 * (Install [just](https://github.com/casey/just))
 * Update the download URL in ./justfile

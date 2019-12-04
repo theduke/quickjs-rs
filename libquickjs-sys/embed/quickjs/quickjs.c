@@ -14888,6 +14888,7 @@ static JSValue JS_CallInternal(JSContext *ctx, JSValueConst func_obj,
 
     alloca_size = sizeof(JSValue) * (arg_allocated_size + b->var_count +
                                      b->stack_size);
+
     if (js_check_stack_overflow(ctx, alloca_size))
         return JS_ThrowStackOverflow(ctx);
 
