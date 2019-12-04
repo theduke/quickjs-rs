@@ -1,6 +1,13 @@
 use std::{convert::TryFrom, marker::PhantomData, panic::RefUnwindSafe};
+use std::os::raw::c_int;
+use std::ffi::c_void;
 
+use crate::bindings::{ContextWrapper, TAG_EXCEPTION, TAG_NULL, TAG_OBJECT};
 use crate::value::{JsValue, ValueError};
+use crate::ExecutionError;
+use crate::marshal::{deserialize_value, serialize_value};
+
+use libquickjs_sys as q;
 
 pub trait IntoCallbackResult {
     fn into_callback_res(self) -> Result<JsValue, String>;
@@ -30,7 +37,7 @@ pub trait Callback<F>: RefUnwindSafe {
     ///
     /// Should return:
     ///   - Err(_) if the JS values could not be converted
-    ///   - Ok(Err(_)) if an error ocurred while processing.
+    ///   - Ok(Err(_)) if an error occurred while processing.
     ///       The given error will be raised as a JS exception.
     ///   - Ok(Ok(result)) when execution succeeded.
     fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError>;
@@ -141,157 +148,135 @@ where
     }
 }
 
-// Implement Callback for Fn() -> R functions.
-//impl<R, F> Callback<PhantomData<(&R, &F)>> for F
-//where
-//R: Into<JsValue>,
-//F: Fn() -> R + Sized + RefUnwindSafe,
-//{
-//fn argument_count(&self) -> usize {
-//0
-//}
+impl ContextWrapper {
+    /// Helper for executing a callback closure.
+    fn exec_callback<F>(
+        context: *mut q::JSContext,
+        argc: c_int,
+        argv: *mut q::JSValue,
+        callback: &impl Callback<F>,
+    ) -> Result<q::JSValue, ExecutionError> {
+        let result = std::panic::catch_unwind(|| {
+            let arg_slice = unsafe { std::slice::from_raw_parts(argv, argc as usize) };
 
-//fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
-//if !args.is_empty() {
-//return Ok(Err(format!(
-//"Invalid argument count: Expected 0, got {}",
-//args.len()
-//)));
-//}
+            let args = arg_slice
+                .iter()
+                .map(|raw| deserialize_value(context, raw))
+                .collect::<Result<Vec<_>, _>>()?;
 
-//let res = self().into();
-//Ok(Ok(res))
-//}
-//}
+            match callback.call(args) {
+                Ok(Ok(result)) => {
+                    let serialized = serialize_value(context, result)?;
+                    Ok(serialized)
+                }
+                // TODO: better error reporting.
+                Ok(Err(e)) => Err(ExecutionError::Exception(JsValue::String(e))),
+                Err(e) => Err(e.into()),
+            }
+        });
 
-// Implement Callback for Fn(A) -> R functions.
-//impl<A1, R, F> Callback<PhantomData<(&A1, &R, &F)>> for F
-//where
-//A1: TryFrom<JsValue, Error = ValueError>,
-//R: Into<JsValue>,
-//F: Fn(A1) -> R + Sized + RefUnwindSafe,
-//{
-//fn argument_count(&self) -> usize {
-//1
-//}
-//fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
-//if args.len() != 1 {
-//return Ok(Err(format!(
-//"Invalid argument count: Expected 1, got {}",
-//args.len()
-//)));
-//}
+        match result {
+            Ok(r) => r,
+            Err(_e) => Err(ExecutionError::Internal("Callback panicked!".to_string())),
+        }
+    }
 
-//let arg_raw = args.into_iter().next().expect("Invalid argument count");
-//let arg = A1::try_from(arg_raw)?;
-//let res = self(arg).into();
-//Ok(Ok(res))
-//}
-//}
+    /// Add a global JS function that is backed by a Rust function or closure.
+    pub fn create_callback<F>(
+        &self,
+        callback: impl Callback<F> + 'static,
+    ) -> Result<q::JSValue, ExecutionError> {
+        let argcount = callback.argument_count() as i32;
 
-//// Implement Callback for Fn(A1, A2) -> R functions.
-//impl<A1, A2, R, F> Callback<PhantomData<(&A1, &A2, &R, &F)>> for F
-//where
-//A1: TryFrom<JsValue, Error = ValueError>,
-//A2: TryFrom<JsValue, Error = ValueError>,
-//R: Into<JsValue>,
-//F: Fn(A1, A2) -> R + Sized + RefUnwindSafe,
-//{
-//fn argument_count(&self) -> usize {
-//2
-//}
+        let context = self.context;
+        let wrapper = move |argc: c_int, argv: *mut q::JSValue| -> q::JSValue {
+            match Self::exec_callback(context, argc, argv, &callback) {
+                Ok(value) => value,
+                // TODO: better error reporting.
+                Err(e) => {
+                    let js_exception_value = match e {
+                        ExecutionError::Exception(e) => e,
+                        other => other.to_string().into(),
+                    };
+                    let js_exception = serialize_value(context, js_exception_value).unwrap();
+                    unsafe {
+                        q::JS_Throw(context, js_exception);
+                    }
 
-//fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
-//if args.len() != 2 {
-//return Ok(Err(format!(
-//"Invalid argument count: Expected 2, got {}",
-//args.len()
-//)));
-//}
+                    q::JSValue {
+                        u: q::JSValueUnion { int32: 0 },
+                        tag: TAG_EXCEPTION,
+                    }
+                }
+            }
+        };
 
-//let mut iter = args.into_iter();
-//let arg1_raw = iter.next().expect("Invalid argument count");
-//let arg1 = A1::try_from(arg1_raw)?;
+        let (pair, trampoline) = unsafe { build_closure_trampoline(wrapper) };
+        let data = (&*pair.1) as *const q::JSValue as *mut q::JSValue;
+        self.callbacks.lock().unwrap().push(pair);
 
-//let arg2_raw = iter.next().expect("Invalid argument count");
-//let arg2 = A2::try_from(arg2_raw)?;
+        let cfunc =
+            unsafe { q::JS_NewCFunctionData(self.context, trampoline, argcount, 0, 1, data) };
+        if cfunc.tag != TAG_OBJECT {
+            return Err(ExecutionError::Internal("Could not create callback".into()));
+        }
 
-//let res = self(arg1, arg2).into();
-//Ok(Ok(res))
-//}
-//}
+        Ok(cfunc)
+    }
 
-// Implement Callback for Fn(A1, A2, A3) -> R functions.
-//impl<A1, A2, A3, R, F> Callback<PhantomData<(&A1, &A2, &A3, &R, &F)>> for F
-//where
-//A1: TryFrom<JsValue, Error = ValueError>,
-//A2: TryFrom<JsValue, Error = ValueError>,
-//A3: TryFrom<JsValue, Error = ValueError>,
-//R: Into<JsValue>,
-//F: Fn(A1, A2, A3) -> R + Sized + RefUnwindSafe,
-//{
-//fn argument_count(&self) -> usize {
-//3
-//}
+    pub fn add_callback<'a, F>(
+        &'a self,
+        name: &str,
+        callback: impl Callback<F> + 'static,
+    ) -> Result<(), ExecutionError> {
+        let cfunc = self.create_callback(callback)?;
+        let global = self.global()?;
+        unsafe {
+            global.set_property_raw(name, cfunc)?;
+        }
+        Ok(())
+    }
+}
 
-//fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
-//if args.len() != self.argument_count() {
-//return Ok(Err(format!(
-//"Invalid argument count: Expected 3, got {}",
-//args.len()
-//)));
-//}
+pub type WrappedCallback = dyn Fn(c_int, *mut q::JSValue) -> q::JSValue;
 
-//let mut iter = args.into_iter();
-//let arg1_raw = iter.next().expect("Invalid argument count");
-//let arg1 = A1::try_from(arg1_raw)?;
+/// Taken from: https://s3.amazonaws.com/temp.michaelfbryan.com/callbacks/index.html
+///
+/// Create a C wrapper function for a Rust closure to enable using it as a
+/// callback function in the Quickjs runtime.
+///
+/// Both the boxed closure and the boxed data are returned and must be stored
+/// by the caller to guarantee they stay alive.
+unsafe fn build_closure_trampoline<F>(
+    closure: F,
+) -> ((Box<WrappedCallback>, Box<q::JSValue>), q::JSCFunctionData)
+where
+    F: Fn(c_int, *mut q::JSValue) -> q::JSValue + 'static,
+{
+    unsafe extern "C" fn trampoline<F>(
+        _ctx: *mut q::JSContext,
+        _this: q::JSValue,
+        argc: c_int,
+        argv: *mut q::JSValue,
+        _magic: c_int,
+        data: *mut q::JSValue,
+    ) -> q::JSValue
+    where
+        F: Fn(c_int, *mut q::JSValue) -> q::JSValue,
+    {
+        let closure_ptr = (*data).u.ptr;
+        let closure: &mut F = &mut *(closure_ptr as *mut F);
+        (*closure)(argc, argv)
+    }
 
-//let arg2_raw = iter.next().expect("Invalid argument count");
-//let arg2 = A2::try_from(arg2_raw)?;
+    let boxed_f = Box::new(closure);
 
-//let arg3_raw = iter.next().expect("Invalid argument count");
-//let arg3 = A3::try_from(arg3_raw)?;
+    let data = Box::new(q::JSValue {
+        u: q::JSValueUnion {
+            ptr: (&*boxed_f) as *const F as *mut c_void,
+        },
+        tag: TAG_NULL,
+    });
 
-//let res = self(arg1, arg2, arg3).into();
-//Ok(Ok(res))
-//}
-//}
-
-//// Implement Callback for Fn(A1, A2, A3, A4) -> R functions.
-//impl<A1, A2, A3, A4, R, F> Callback<PhantomData<(&A1, &A2, &A3, &A4, &R, &F)>> for F
-//where
-//A1: TryFrom<JsValue, Error = ValueError>,
-//A2: TryFrom<JsValue, Error = ValueError>,
-//A3: TryFrom<JsValue, Error = ValueError>,
-//A4: TryFrom<JsValue, Error = ValueError>,
-//R: Into<JsValue>,
-//F: Fn(A1, A2, A3) -> R + Sized + RefUnwindSafe,
-//{
-//fn argument_count(&self) -> usize {
-//4
-//}
-
-//fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
-//if args.len() != self.argument_count() {
-//return Ok(Err(format!(
-//"Invalid argument count: Expected 3, got {}",
-//args.len()
-//)));
-//}
-
-//let mut iter = args.into_iter();
-//let arg1_raw = iter.next().expect("Invalid argument count");
-//let arg1 = A1::try_from(arg1_raw)?;
-
-//let arg2_raw = iter.next().expect("Invalid argument count");
-//let arg2 = A2::try_from(arg2_raw)?;
-
-//let arg3_raw = iter.next().expect("Invalid argument count");
-//let arg3 = A3::try_from(arg3_raw)?;
-
-//let res = self(arg1, arg2, arg3).into();
-//Ok(Ok(res))
-//}
-//}
-
-// RESULT variants.
+    ((boxed_f, data), Some(trampoline::<F>))
+}

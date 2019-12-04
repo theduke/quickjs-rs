@@ -1,12 +1,18 @@
 #[cfg(feature = "bigint")]
 pub(crate) mod bigint;
+pub(crate) mod marshal;
 
 use std::{collections::HashMap, error, fmt};
 
+use crate::owned_value_ref::OwnedValueRef;
 #[cfg(feature = "bigint")]
 pub use bigint::BigInt;
+use crate::ExecutionError;
+use crate::utils::js_null_value;
+use crate::marshal::{serialize_value, deserialize_value};
 
 /// A value that can be (de)serialized to/from the quickjs runtime.
+/// See the marshal module.
 #[derive(PartialEq, Clone, Debug)]
 #[allow(missing_docs)]
 pub enum JsValue {
@@ -25,6 +31,7 @@ pub enum JsValue {
     /// Only available with the optional `bigint` feature
     #[cfg(feature = "bigint")]
     BigInt(crate::BigInt),
+    OpaqueFunction(OwnedValueRef),
     #[doc(hidden)]
     __NonExhaustive,
 }
@@ -179,8 +186,8 @@ impl std::convert::TryFrom<JsValue> for num_bigint::BigInt {
 }
 
 impl<T> From<Vec<T>> for JsValue
-where
-    T: Into<JsValue>,
+    where
+        T: Into<JsValue>,
 {
     fn from(values: Vec<T>) -> Self {
         let items = values.into_iter().map(|x| x.into()).collect();
@@ -195,8 +202,8 @@ impl<'a> From<&'a str> for JsValue {
 }
 
 impl<T> From<Option<T>> for JsValue
-where
-    T: Into<JsValue>,
+    where
+        T: Into<JsValue>,
 {
     fn from(opt: Option<T>) -> Self {
         if let Some(value) = opt {
@@ -208,13 +215,109 @@ where
 }
 
 impl<K, V> From<HashMap<K, V>> for JsValue
-where
-    K: Into<String>,
-    V: Into<JsValue>,
+    where
+        K: Into<String>,
+        V: Into<JsValue>,
 {
     fn from(map: HashMap<K, V>) -> Self {
         let new_map = map.into_iter().map(|(k, v)| (k.into(), v.into())).collect();
         JsValue::Object(new_map)
+    }
+}
+
+/// Represents a JS function. Can be used for calling back into JS code.
+///
+/// # Example
+/// ```rust
+/// use quick_js::OpaqueJsFunction;
+/// fn register_state_listener(id: String, callback_function: OpaqueJsFunction) -> String {
+///    callback_function.invoke(vec![id]);
+///    id
+///}
+///
+/// fn main() -> Result<(), dyn std::error::Error> {
+/// use quick_js::Context;
+/// let mut context = Context::builder().build()?;
+/// context.add_callback("notifyOnThingStatesChange", register_state_listener)?;
+/// Ok(())
+/// }
+/// ```
+pub struct OpaqueJsFunction(OwnedValueRef);
+
+impl OpaqueJsFunction {
+    /// Calls the js function
+    pub fn invoke(
+        &self,
+        args: impl IntoIterator<Item = impl Into<JsValue>>,
+    ) -> Result<JsValue, ExecutionError> {
+        let mut qargs :Vec<q::JSValue>= args
+            .into_iter()
+            .map(|arg| serialize_value(self.0.context,arg.into()).unwrap_or(js_null_value()))
+            .collect();
+
+        use libquickjs_sys as q;
+
+        let qres_raw = unsafe {
+            q::JS_Call(
+                self.0.context,
+                self.0.value,
+                js_null_value(),
+                qargs.len() as i32,
+                qargs.as_mut_ptr(),
+            )
+        };
+        let qres = OwnedValueRef::wrap(self.0.context, qres_raw);
+        Ok(deserialize_value(self.0.context, &qres.value)?)
+    }
+}
+
+impl std::convert::TryFrom<JsValue> for OpaqueJsFunction {
+    type Error = ValueError;
+
+    fn try_from(value: JsValue) -> Result<Self, Self::Error> {
+        match value {
+            JsValue::OpaqueFunction(value) => Ok(OpaqueJsFunction(value)),
+            _ => Err(ValueError::UnexpectedType),
+        }
+    }
+}
+
+/// Can be used as generic argument in a callback function.
+/// Can only contain basic types, no functions, no objects, no nested ones.
+#[derive(Debug)]
+#[allow(missing_docs)]
+pub enum JsSimpleArgumentValue {
+    Null,
+    Bool(bool),
+    Int(i32),
+    Float(f64),
+    String(String),
+    /// chrono::Datetime<Utc> / JS Date integration.
+    /// Only available with the optional `chrono` feature.
+    #[cfg(feature = "chrono")]
+    Date(chrono::DateTime<chrono::Utc>),
+    /// num_bigint::BigInt / JS BigInt integration
+    /// Only available with the optional `bigint` feature
+    #[cfg(feature = "bigint")]
+    BigInt(BigInt),
+}
+
+impl std::convert::TryFrom<JsValue> for JsSimpleArgumentValue {
+    type Error = ValueError;
+
+    fn try_from(value: JsValue) -> Result<Self, Self::Error> {
+        match value {
+            JsValue::Null => Ok(JsSimpleArgumentValue::Null),
+            JsValue::Bool(value) => Ok(JsSimpleArgumentValue::Bool(value)),
+            JsValue::Int(value) => Ok(JsSimpleArgumentValue::Int(value)),
+            JsValue::Float(value) => Ok(JsSimpleArgumentValue::Float(value)),
+            JsValue::String(value) => Ok(JsSimpleArgumentValue::String(value)),
+            #[cfg(feature = "chrono")]
+            JsValue::Date(value) => Ok(JsSimpleArgumentValue::Date(value)),
+            #[cfg(feature = "bigint")]
+            JsValue::BigInt(value) => Ok(JsSimpleArgumentValue::BigInt(value)),
+            _ => Err(ValueError::UnexpectedType),
+        }
     }
 }
 
@@ -250,7 +353,7 @@ impl fmt::Display for ValueError {
                 "Value conversion failed - invalid non-utf8 string: {}",
                 e
             ),
-            StringWithZeroBytes(_) => write!(f, "String contains \\0 bytes",),
+            StringWithZeroBytes(_) => write!(f, "String contains \\0 bytes", ),
             Internal(e) => write!(f, "Value conversion failed - internal error: {}", e),
             UnexpectedType => write!(f, "Could not convert - received unexpected type"),
             __NonExhaustive => unreachable!(),
