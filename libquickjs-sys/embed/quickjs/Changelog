@@ -1,3 +1,34 @@
+2020-01-19:
+
+- keep CONFIG_BIGNUM in the makefile
+- added os.chdir()
+- qjs: added -I option
+- more memory checks in the bignum operations
+- modified operator overloading semantics to be closer to the TC39
+  proposal
+- suppressed "use bigint" mode. Simplified "use math" mode
+- BigDecimal: changed suffix from 'd' to 'm'
+- misc bug fixes
+
+2020-01-05:
+
+- always compile the bignum code. Added '--bignum' option to qjs.
+- added BigDecimal
+- added String.prototype.replaceAll
+- misc bug fixes
+
+2019-12-21:
+
+- added nullish coalescing operator (ES2020)
+- added optional chaining (ES2020)
+- removed recursions in garbage collector
+- test stack overflow in the parser
+- improved backtrace logic
+- added JS_SetHostPromiseRejectionTracker()
+- allow exotic constructors
+- improved c++ compatibility
+- misc bug fixes
+
 2019-10-27:
 
 - added example of C class in a module (examples/test_point.js)
