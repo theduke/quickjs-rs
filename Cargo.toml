@@ -15,7 +15,7 @@ features = [ "chrono", "bigint", "log" ]
 
 [features]
 patched = ["libquickjs-sys/patched"]
-bigint = ["num-bigint", "num-traits", "libquickjs-sys/bignum", "libquickjs-sys/patched"]
+bigint = ["num-bigint", "num-traits", "libquickjs-sys/patched"]
 
 [dependencies]
 libquickjs-sys = { version = "0.4.0", path = "./libquickjs-sys" }
