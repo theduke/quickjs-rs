@@ -6,9 +6,6 @@ fn exists(path: impl AsRef<Path>) -> bool {
     PathBuf::from(path.as_ref()).exists()
 }
 
-#[cfg(feature = "bignum")]
-const LIB_NAME: &str = "quickjs.bn";
-#[cfg(not(feature = "bignum"))]
 const LIB_NAME: &str = "quickjs";
 
 #[cfg(all(not(feature = "system"), not(feature = "bundled")))]
