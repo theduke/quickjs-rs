@@ -1,8 +1,8 @@
 /*
  * QuickJS stand alone interpreter
  * 
- * Copyright (c) 2017-2018 Fabrice Bellard
- * Copyright (c) 2017-2018 Charlie Gordon
+ * Copyright (c) 2017-2020 Fabrice Bellard
+ * Copyright (c) 2017-2020 Charlie Gordon
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -250,27 +250,27 @@ static const JSMallocFunctions trace_mf = {
 #endif
 };
 
-#ifdef CONFIG_BIGNUM
-#define PROG_NAME "qjsbn"
-#else
 #define PROG_NAME "qjs"
-#endif
 
 void help(void)
 {
     printf("QuickJS version " CONFIG_VERSION "\n"
-           "usage: " PROG_NAME " [options] [file]\n"
+           "usage: " PROG_NAME " [options] [file [args]]\n"
            "-h  --help         list options\n"
            "-e  --eval EXPR    evaluate EXPR\n"
            "-i  --interactive  go to interactive mode\n"
            "-m  --module       load as ES6 module (default=autodetect)\n"
            "    --script       load as ES6 script (default=autodetect)\n"
+           "-I  --include file include an additional file\n"
            "    --std          make 'std' and 'os' available to the loaded script\n"
 #ifdef CONFIG_BIGNUM
+           "    --bignum       enable the bignum extensions (BigFloat, BigDecimal)\n"
            "    --qjscalc      load the QJSCalc runtime (default if invoked as qjscalc)\n"
 #endif
            "-T  --trace        trace memory allocation\n"
            "-d  --dump         dump the memory usage stats\n"
+           "    --memory-limit n       limit the memory usage to 'n' bytes\n"
+           "    --unhandled-rejection  dump unhandled promise rejections\n"
            "-q  --quit         just instantiate the interpreter and quit\n");
     exit(1);
 }
@@ -288,8 +288,12 @@ int main(int argc, char **argv)
     int empty_run = 0;
     int module = -1;
     int load_std = 0;
+    int dump_unhandled_promise_rejection = 0;
+    size_t memory_limit = 0;
+    char *include_list[32];
+    int i, include_count = 0;
 #ifdef CONFIG_BIGNUM
-    int load_jscalc;
+    int load_jscalc, bignum_ext = 0;
 #endif
 
 #ifdef CONFIG_BIGNUM
@@ -341,6 +345,18 @@ int main(int argc, char **argv)
                 fprintf(stderr, "qjs: missing expression for -e\n");
                 exit(2);
             }
+            if (opt == 'I' || !strcmp(longopt, "include")) {
+                if (optind >= argc) {
+                    fprintf(stderr, "expecting filename");
+                    exit(1);
+                }
+                if (include_count >= countof(include_list)) {
+                    fprintf(stderr, "too many included files");
+                    exit(1);
+                }
+                include_list[include_count++] = argv[optind++];
+                continue;
+            }
             if (opt == 'i' || !strcmp(longopt, "interactive")) {
                 interactive++;
                 continue;
@@ -365,7 +381,15 @@ int main(int argc, char **argv)
                 load_std = 1;
                 continue;
             }
+            if (!strcmp(longopt, "unhandled-rejection")) {
+                dump_unhandled_promise_rejection = 1;
+                continue;
+            }
 #ifdef CONFIG_BIGNUM
+            if (!strcmp(longopt, "bignum")) {
+                bignum_ext = 1;
+                continue;
+            }
             if (!strcmp(longopt, "qjscalc")) {
                 load_jscalc = 1;
                 continue;
@@ -373,6 +397,14 @@ int main(int argc, char **argv)
 #endif
             if (opt == 'q' || !strcmp(longopt, "quit")) {
                 empty_run++;
+                continue;
+            }
+            if (!strcmp(longopt, "memory-limit")) {
+                if (optind >= argc) {
+                    fprintf(stderr, "expecting memory limit");
+                    exit(1);
+                }
+                memory_limit = (size_t)strtod(argv[optind++], NULL);
                 continue;
             }
             if (opt) {
@@ -394,15 +426,31 @@ int main(int argc, char **argv)
         fprintf(stderr, "qjs: cannot allocate JS runtime\n");
         exit(2);
     }
+    if (memory_limit != 0)
+        JS_SetMemoryLimit(rt, memory_limit);
     ctx = JS_NewContext(rt);
     if (!ctx) {
         fprintf(stderr, "qjs: cannot allocate JS context\n");
         exit(2);
     }
 
+#ifdef CONFIG_BIGNUM
+    if (bignum_ext || load_jscalc) {
+        JS_AddIntrinsicBigFloat(ctx);
+        JS_AddIntrinsicBigDecimal(ctx);
+        JS_AddIntrinsicOperators(ctx);
+        JS_EnableBignumExt(ctx, TRUE);
+    }
+#endif
+    
     /* loader for ES6 modules */
     JS_SetModuleLoaderFunc(rt, NULL, js_module_loader, NULL);
-                           
+
+    if (dump_unhandled_promise_rejection) {
+        JS_SetHostPromiseRejectionTracker(rt, js_std_promise_rejection_tracker,
+                                          NULL);
+    }
+    
     if (!empty_run) {
 #ifdef CONFIG_BIGNUM
         if (load_jscalc) {
@@ -422,6 +470,11 @@ int main(int argc, char **argv)
                 "globalThis.std = std;\n"
                 "globalThis.os = os;\n";
             eval_buf(ctx, str, strlen(str), "<input>", JS_EVAL_TYPE_MODULE);
+        }
+
+        for(i = 0; i < include_count; i++) {
+            if (eval_file(ctx, include_list[i], module))
+                goto fail;
         }
 
         if (expr) {
