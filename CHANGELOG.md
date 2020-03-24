@@ -2,6 +2,11 @@
 
 ## Master branch
 
+## v0.3.1 - 2020-03-24
+
+* Update quickjs to 2020-03-16
+* Add `TryFrom<JsValue>` impl for `HashMap<String, X>`
+
 ## v0.3.0 - 2019-11-02
 
 ### Features
