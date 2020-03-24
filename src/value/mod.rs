@@ -1,6 +1,7 @@
 #[cfg(feature = "bigint")]
 pub(crate) mod bigint;
 
+use std::convert::{TryFrom, TryInto};
 use std::{collections::HashMap, error, fmt};
 
 #[cfg(feature = "bigint")]
@@ -215,6 +216,26 @@ where
     fn from(map: HashMap<K, V>) -> Self {
         let new_map = map.into_iter().map(|(k, v)| (k.into(), v.into())).collect();
         JsValue::Object(new_map)
+    }
+}
+
+impl<V> TryFrom<JsValue> for HashMap<String, V>
+where
+    V: TryFrom<JsValue>,
+{
+    type Error = ValueError;
+
+    fn try_from(value: JsValue) -> Result<Self, Self::Error> {
+        match value {
+            JsValue::Object(object) => object
+                .into_iter()
+                .map(|(k, v)| match v.try_into() {
+                    Ok(v) => Ok((k, v)),
+                    Err(_) => Err(ValueError::UnexpectedType),
+                })
+                .collect(),
+            _ => Err(ValueError::UnexpectedType),
+        }
     }
 }
 
