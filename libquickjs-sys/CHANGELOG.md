@@ -1,5 +1,12 @@
 # libquickjs_sys - Changelog
 
+## v0.5.0 - 2020-03-24
+
+Upgraded to version `2020-03-16`:
+
+- Added functions `JS_GetRuntimeOpaque`, `JS_SetRuntimeOpaque`
+- Removed function `JS_NewInt64`, JS_ToInt64Ext
+
 ## v0.4.0 - 2019-11-02
 
 Upgraded to version `2019-09-18`:

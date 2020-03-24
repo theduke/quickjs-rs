@@ -2,7 +2,7 @@
 edition = "2018"
 name = "libquickjs-sys"
 description = "QuickJS Javascript Engine FFI bindings"
-version = "0.4.0"
+version = "0.5.0"
 readme = "README.md"
 documentation = "https://docs.rs/quickjs-sys"
 repository = "https://github.com/theduke/quickjs-rs"
