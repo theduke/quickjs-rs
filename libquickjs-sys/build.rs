@@ -67,8 +67,10 @@ fn main() {
     apply_patches(&code_dir);
 
     eprintln!("Compiling quickjs...");
+    let compiler = cc::Build::new().get_compiler();
     std::process::Command::new("make")
         .arg(format!("lib{}.a", LIB_NAME))
+        .arg(format!("CC={}", compiler.path().to_string_lossy()))
         .current_dir(&code_dir)
         .spawn()
         .expect("Could not compile quickjs")
