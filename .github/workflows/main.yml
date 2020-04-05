@@ -36,6 +36,7 @@ jobs:
         echo "Install just"
         curl -LSfs https://japaric.github.io/trust/install.sh | sh -s -- --git casey/just --target x86_64-unknown-linux-musl --to $HOME
         echo "Run setup"
+        sudo apt-get update -y
         sudo apt-get install -y curl xz-utils build-essential gcc-multilib valgrind
       if: matrix.os == 'ubuntu-latest'
 
