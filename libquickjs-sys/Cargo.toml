@@ -14,7 +14,7 @@ keywords = ["quickjs"]
 build = "build.rs"
 
 [features]
-bundled = ["copy_dir"]
+bundled = ["cc", "copy_dir"]
 patched = []
 default = ["bundled"]
 
@@ -22,5 +22,6 @@ system = ["bindgen"]
 
 [build-dependencies]
 bindgen = { version = "0.51.0", optional = true }
+cc = { version = "1.0", optional = true }
 copy_dir = { version = "0.1.2", optional = true }
 
