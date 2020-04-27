@@ -491,30 +491,25 @@ fn deserialize_value(
         #[cfg(feature = "bigint")]
         TAG_BIG_INT => {
             let mut int: i64 = 0;
-            let ret = unsafe { q::JS_ToBigInt64(context, &mut int, *r) };
-            if ret == 0 {
-                Ok(JsValue::BigInt(BigInt {
-                    inner: BigIntOrI64::Int(int),
-                }))
-            } else {
-                let ptr = unsafe { q::JS_ToCStringLen2(context, std::ptr::null_mut(), *r, 0) };
+            unsafe { q::JS_ToBigInt64(context, &mut int, *r) };
 
-                if ptr.is_null() {
-                    return Err(ValueError::Internal(
-                        "Could not convert BigInt to string: got a null pointer".into(),
-                    ));
-                }
+            let ptr = unsafe { q::JS_ToCStringLen2(context, std::ptr::null_mut(), *r, 0) };
 
-                let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
-                let bigint = num_bigint::BigInt::parse_bytes(cstr.to_bytes(), 10).unwrap();
-
-                // Free the c string.
-                unsafe { q::JS_FreeCString(context, ptr) };
-
-                Ok(JsValue::BigInt(BigInt {
-                    inner: BigIntOrI64::BigInt(bigint),
-                }))
+            if ptr.is_null() {
+                return Err(ValueError::Internal(
+                    "Could not convert BigInt to string: got a null pointer".into(),
+                ));
             }
+
+            let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
+            let bigint = num_bigint::BigInt::parse_bytes(cstr.to_bytes(), 10).unwrap();
+
+            // Free the c string.
+            unsafe { q::JS_FreeCString(context, ptr) };
+
+            Ok(JsValue::BigInt(BigInt {
+                inner: BigIntOrI64::BigInt(bigint),
+            }))
         }
         x => Err(ValueError::Internal(format!(
             "Unhandled JS_TAG value: {}",
