@@ -219,7 +219,7 @@ where
     }
 }
 
-impl<V> TryFrom<JsValue> for HashMap<String, V>
+impl<V, S: ::std::hash::BuildHasher + Default> TryFrom<JsValue> for HashMap<String, V, S>
 where
     V: TryFrom<JsValue>,
 {
