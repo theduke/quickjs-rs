@@ -24,7 +24,7 @@ fn main() {
     #[cfg(feature = "patched")]
     panic!("Invalid configuration for libquickjs-sys: the patched feature is incompatible with the system feature");
 
-    let lib: std::borrow::Cow<str> = if let Ok(lib) = env::var("QUICKJS_LIB") {
+    let lib: std::borrow::Cow<str> = if let Ok(lib) = env::var("QUICKJS_LIBRARY_PATH") {
         lib.into()
     } else if cfg!(unix) {
         if exists(format!("/usr/lib/quickjs/{}.a", LIB_NAME)) {
@@ -32,7 +32,7 @@ fn main() {
         } else if exists("/usr/local/lib/quickjs") {
             "/usr/local/lib/quickjs".into()
         } else {
-            panic!("quickjs is not supported on this platform, try setting the QUICKJS_LIB env variable");
+            panic!("quickjs library could not be found. Try setting the QUICKJS_LIBRARY_PATH env variable");
         }
     } else {
         panic!("quickjs error: Windows is not supported yet");
