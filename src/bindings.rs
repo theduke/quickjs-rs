@@ -106,8 +106,9 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
             tag: TAG_FLOAT64,
         },
         JsValue::String(val) => {
-            let qval =
-                unsafe { q::JS_NewStringLen(context, val.as_ptr() as *const c_char, val.len()) };
+            let qval = unsafe {
+                q::JS_NewStringLen(context, val.as_ptr() as *const c_char, val.len() as _)
+            };
 
             if qval.tag == TAG_EXCEPTION {
                 return Err(ValueError::Internal(
@@ -415,9 +416,7 @@ fn deserialize_value(
         }
         // String.
         TAG_STRING => {
-            let ptr = unsafe {
-                q::JS_ToCStringLen2(context, std::ptr::null::<usize>() as *mut usize, *r, 0)
-            };
+            let ptr = unsafe { q::JS_ToCStringLen2(context, std::ptr::null_mut(), *r, 0) };
 
             if ptr.is_null() {
                 return Err(ValueError::Internal(
@@ -813,7 +812,7 @@ impl ContextWrapper {
         // Configure memory limit if specified.
         if let Some(limit) = memory_limit {
             unsafe {
-                q::JS_SetMemoryLimit(runtime, limit);
+                q::JS_SetMemoryLimit(runtime, limit as _);
             }
         }
 
@@ -1039,7 +1038,7 @@ impl ContextWrapper {
             q::JS_Eval(
                 self.context,
                 code_c.as_ptr(),
-                code.len(),
+                code.len() as _,
                 filename_c.as_ptr(),
                 q::JS_EVAL_TYPE_GLOBAL as i32,
             )
