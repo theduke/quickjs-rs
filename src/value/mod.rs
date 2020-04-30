@@ -9,6 +9,11 @@ pub use bigint::BigInt;
 
 /// A value that can be (de)serialized to/from the quickjs runtime.
 #[derive(PartialEq, Clone, Debug)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(untagged)
+)]
 #[allow(missing_docs)]
 pub enum JsValue {
     Null,
@@ -21,12 +26,15 @@ pub enum JsValue {
     /// chrono::Datetime<Utc> / JS Date integration.
     /// Only available with the optional `chrono` feature.
     #[cfg(feature = "chrono")]
+    #[cfg_attr(feature = "serde", serde(skip))]
     Date(chrono::DateTime<chrono::Utc>),
     /// num_bigint::BigInt / JS BigInt integration
     /// Only available with the optional `bigint` feature
     #[cfg(feature = "bigint")]
+    #[cfg_attr(feature = "serde", serde(skip))]
     BigInt(crate::BigInt),
     #[doc(hidden)]
+    #[cfg_attr(feature = "serde", serde(skip))]
     __NonExhaustive,
 }
 
