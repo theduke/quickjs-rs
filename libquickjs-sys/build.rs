@@ -69,25 +69,42 @@ fn main() {
     apply_patches(&code_dir);
 
     eprintln!("Compiling quickjs...");
-    let compiler = cc::Build::new().get_compiler();
-    std::process::Command::new("make")
-        .arg(format!("lib{}.a", LIB_NAME))
-        .arg(format!("CC={}", compiler.path().to_string_lossy()))
-        .current_dir(&code_dir)
-        .spawn()
-        .expect("Could not compile quickjs")
-        .wait()
-        .expect("Could not compile quickjs");
+    let quickjs_version =
+        std::fs::read_to_string(code_dir.join("VERSION")).expect("failed to read quickjs version");
+    cc::Build::new()
+        .files(
+            [
+                "cutils.c",
+                "libbf.c",
+                "libregexp.c",
+                "libunicode.c",
+                "quickjs-libc.c",
+                "quickjs.c",
+            ]
+            .iter()
+            .map(|f| code_dir.join(f)),
+        )
+        .define("_GNU_SOURCE", None)
+        .define(
+            "CONFIG_VERSION",
+            format!("\"{}\"", quickjs_version.trim()).as_str(),
+        )
+        .define("CONFIG_BIGNUM", None)
+        .flag_if_supported("-Wchar-subscripts")
+        .flag_if_supported("-Wno-array-bounds")
+        .flag_if_supported("-Wno-format-truncation")
+        .flag_if_supported("-Wno-missing-field-initializers")
+        .flag_if_supported("-Wno-sign-compare")
+        .flag_if_supported("-Wno-unused-parameter")
+        .flag_if_supported("-Wundef")
+        .flag_if_supported("-Wuninitialized")
+        .flag_if_supported("-Wunused")
+        .flag_if_supported("-Wwrite-strings")
+        .flag_if_supported("-funsigned-char")
+        .compile(LIB_NAME);
 
     std::fs::copy("./embed/bindings.rs", out_path.join("bindings.rs"))
         .expect("Could not copy bindings.rs");
-
-    // Instruct cargo to statically link quickjs.
-    println!(
-        "cargo:rustc-link-search=native={}",
-        code_dir.to_str().unwrap()
-    );
-    println!("cargo:rustc-link-lib=static={}", LIB_NAME);
 }
 
 #[cfg(feature = "patched")]
