@@ -2,7 +2,7 @@
 edition = "2018"
 name = "libquickjs-sys"
 description = "QuickJS Javascript Engine FFI bindings"
-version = "0.5.0"
+version = "0.6.0"
 readme = "README.md"
 documentation = "https://docs.rs/quickjs-sys"
 repository = "https://github.com/theduke/quickjs-rs"
@@ -15,13 +15,12 @@ build = "build.rs"
 
 [features]
 bundled = ["cc", "copy_dir"]
-patched = []
+patched = ["bundled"]
 default = ["bundled"]
 
 system = ["bindgen"]
 
 [build-dependencies]
-bindgen = { version = "0.51.0", optional = true }
+bindgen = { version = "0.54.0", optional = true }
 cc = { version = "1.0", optional = true }
 copy_dir = { version = "0.1.2", optional = true }
-
