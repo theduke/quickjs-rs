@@ -5,59 +5,87 @@ on:
     branches:
       - master
   pull_request: {}
+  release:
+    types:
+      - created
 
 jobs:
   test:
     name: Test on ${{ matrix.os }} with features ${{ matrix.features }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macOS-latest]
-        features: ["--no-default-features", "", "--all-features"]
+        os:
+          - ubuntu-latest
+          - macOS-latest
+          #- windows-latest
     runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v1
 
+    - name: Install stable toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+        components: rustfmt, clippy
 
-    
-    - name: Setup (MacOS)
-      run: |
-        echo "Installing Rust"
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-
-        source $HOME/.cargo/env
-
-        echo "Installing just..."
-        curl -LSfs https://japaric.github.io/trust/install.sh | sh -s -- --git casey/just --to $HOME
-      if: matrix.os == 'macOS-latest'
+    - name: Install `just` command runner
+      uses: extractions/setup-just@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Setup (debian)
       run: |
-        echo "Install just"
-        curl -LSfs https://japaric.github.io/trust/install.sh | sh -s -- --git casey/just --target x86_64-unknown-linux-musl --to $HOME
-        echo "Run setup"
+        echo "Install system tools"
         sudo apt-get update -y
         sudo apt-get install -y curl xz-utils build-essential gcc-multilib valgrind
       if: matrix.os == 'ubuntu-latest'
 
-    - name: Build
+    - name: Build (default features)
       env:
-        FEATURES: ${{ matrix.features }}
+        FEATURES: ""
       run: |
-        source $HOME/.cargo/env
-        $HOME/just FEATURES="$FEATURES" build
+        cargo clean
+        just FEATURES="$FEATURES" build
     
-    - name: Test
+    - name: Test (default features)
       env:
-        FEATURES: ${{ matrix.features }}
+        FEATURES: ""
       run: |
-        source $HOME/.cargo/env
-        $HOME/just FEATURES="$FEATURES" test
+        just FEATURES="$FEATURES" test
     
+    - name: Build (--no-default-features)
+      env:
+        FEATURES: "--no-default-features"
+      run: |
+        cargo clean
+        just FEATURES="$FEATURES" build
+    
+    - name: Test (--no-default-features)
+      env:
+        FEATURES: "--no-default-features"
+      run: |
+        just FEATURES="$FEATURES" test
+
+    - name: Build (--all-features)
+      env:
+        FEATURES: "--all-features"
+      run: |
+        cargo clean
+        just FEATURES="$FEATURES" build
+    
+    - name: Test (--all-features)
+      env:
+        FEATURES: "--all-features"
+      run: |
+        just FEATURES="$FEATURES" test
+
     - name: Lint
-      run: $HOME/just lint
+      run: just lint
       if: matrix.os == 'ubuntu-latest'
     
     - name: Check for leaks (Valgrind)
-      run: $HOME/just valgrind
+      run: just valgrind
       if: matrix.os == 'ubuntu-latest' && matrix.features == '--all-features'
