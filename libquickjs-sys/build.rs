@@ -78,7 +78,6 @@ fn main() {
                 "libbf.c",
                 "libregexp.c",
                 "libunicode.c",
-                "quickjs-libc.c",
                 "quickjs.c",
             ]
             .iter()
