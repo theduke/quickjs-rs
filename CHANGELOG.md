@@ -2,6 +2,10 @@
 
 ## Master branch
 
+## v0.3.2 - 2020-05-25
+
+* Updated quickjs to 2020-04-12
+
 ## v0.3.1 - 2020-03-24
 
 * Update quickjs to 2020-03-16
