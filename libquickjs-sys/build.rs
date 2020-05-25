@@ -101,6 +101,11 @@ fn main() {
         .flag_if_supported("-Wunused")
         .flag_if_supported("-Wwrite-strings")
         .flag_if_supported("-funsigned-char")
+        // cc uses the OPT_LEVEL env var by default, but we hardcode it to -O2
+        // since release builds use -O3 which might be problematic for quickjs,
+        // and debug builds only happen once anyway so the optimization slowdown
+        // is fine.
+        .opt_level(2)
         .compile(LIB_NAME);
 
     std::fs::copy("./embed/bindings.rs", out_path.join("bindings.rs"))
