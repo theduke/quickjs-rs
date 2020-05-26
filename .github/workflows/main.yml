@@ -13,11 +13,12 @@ jobs:
   test:
     name: Test on ${{ matrix.os }} with features ${{ matrix.features }}
     strategy:
+      fail-fast: false
       matrix:
         os:
           - ubuntu-latest
           - macOS-latest
-          #- windows-latest
+          - windows-latest
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -30,6 +31,17 @@ jobs:
         toolchain: stable
         override: true
         components: rustfmt, clippy
+      if: matrix.os != 'windows-latest'
+
+    - name: Install stable toolchain (windows)
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        target: x86_64-pc-windows-gnu
+        override: true
+        components: rustfmt, clippy
+      if: matrix.os == 'windows-latest'
 
     - name: Install `just` command runner
       uses: extractions/setup-just@v1
@@ -43,26 +55,33 @@ jobs:
         sudo apt-get install -y curl xz-utils build-essential gcc-multilib valgrind
       if: matrix.os == 'ubuntu-latest'
 
+    - name: Setup (windows)
+      run: |
+        $env:PATH = "C:\msys64\mingw64\bin;C:\msys64\usr\bin;$env:PATH"
+        echo "::set-env name=PATH::${env:PATH}"
+        echo "::set-env name=CARGO_BUILD_TARGET::x86_64-pc-windows-gnu"
+      if: matrix.os == 'windows-latest'
+
     - name: Build (default features)
       env:
         FEATURES: ""
       run: |
         cargo clean
         just FEATURES="$FEATURES" build
-    
+
     - name: Test (default features)
       env:
         FEATURES: ""
       run: |
         just FEATURES="$FEATURES" test
-    
+
     - name: Build (--no-default-features)
       env:
         FEATURES: "--no-default-features"
       run: |
         cargo clean
         just FEATURES="$FEATURES" build
-    
+
     - name: Test (--no-default-features)
       env:
         FEATURES: "--no-default-features"
@@ -75,7 +94,7 @@ jobs:
       run: |
         cargo clean
         just FEATURES="$FEATURES" build
-    
+
     - name: Test (--all-features)
       env:
         FEATURES: "--all-features"
@@ -85,7 +104,7 @@ jobs:
     - name: Lint
       run: just lint
       if: matrix.os == 'ubuntu-latest'
-    
+
     - name: Check for leaks (Valgrind)
       run: just valgrind
       if: matrix.os == 'ubuntu-latest' && matrix.features == '--all-features'
