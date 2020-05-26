@@ -57,13 +57,15 @@ fn main() {
 
 #[cfg(feature = "bundled")]
 fn main() {
+    let embed_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("embed");
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     let code_dir = out_path.join("quickjs");
     if exists(&code_dir) {
         std::fs::remove_dir_all(&code_dir).unwrap();
     }
-    copy_dir::copy_dir("./embed/quickjs", &code_dir).expect("Could not copy quickjs directory");
+    copy_dir::copy_dir(embed_path.join("quickjs"), &code_dir)
+        .expect("Could not copy quickjs directory");
 
     #[cfg(feature = "patched")]
     apply_patches(&code_dir);
@@ -112,7 +114,7 @@ fn main() {
         .opt_level(2)
         .compile(LIB_NAME);
 
-    std::fs::copy("./embed/bindings.rs", out_path.join("bindings.rs"))
+    std::fs::copy(embed_path.join("bindings.rs"), out_path.join("bindings.rs"))
         .expect("Could not copy bindings.rs");
 }
 
@@ -121,7 +123,9 @@ fn apply_patches(code_dir: &PathBuf) {
     use std::fs;
 
     eprintln!("Applying patches...");
-    for patch in fs::read_dir("./embed/patches").expect("Could not open patches directory") {
+    let embed_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("embed");
+    let patches_path = embed_path.join("patches");
+    for patch in fs::read_dir(patches_path).expect("Could not open patches directory") {
         let patch = patch.expect("Could not open patch");
         eprintln!("Applying {:?}...", patch.file_name());
         let status = std::process::Command::new("patch")
