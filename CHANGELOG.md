@@ -2,6 +2,11 @@
 
 ## Master branch
 
+## v0.3.3 - 2020-05-27
+
+* Add Windows support
+  (only with MSYS2 environment and `x86_64-pc-windows-gnu` target architecture)
+
 ## v0.3.2 - 2020-05-25
 
 * Updated quickjs to 2020-04-12
