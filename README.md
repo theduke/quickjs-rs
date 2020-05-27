@@ -11,10 +11,6 @@ It is fast and supports the full ES2020 specification.
 
 This crate allows you to easily run and integrate with Javascript code from Rust.
 
-## Limitations
-
-* Windows is not supported yet
-
 ## Quickstart
 
 ```toml
@@ -45,25 +41,38 @@ context.eval(r#"
 "#).unwrap();
 ```
 
+## Optional Features
+
+The crate supports the following features:
+
+* `chrono`: chrono integration
+    - adds a `JsValue::Date` variant that can be (de)serialized to/from a JS `Date`
+* `bigint`: arbitrary precision integer support via [num-bigint](https://github.com/rust-num/num-bigint)
+* `log`: allows forwarding `console.log` messages to the `log` crate.
+    Note: must be enabled with `ContextBuilder::console(quick_js::console::LogConsole);`
+
+* `patched` 
+    Enabled automatically for some other features, like `bigint`. 
+    You should not need to enable this manually.
+    Applies QuickJS patches that can be found in `libquickjs-sys/embed/patches` directory.
+
+
 ## Installation
 
 By default, quickjs is **bundled** with the `libquickjs-sys` crate and
 automatically compiled, assuming you have the appropriate dependencies.
 
-If you would like to use a system version instead, see below. 
+### Windows Support
 
-QuickJS will always be statically linked to your binary.
+Windows is only supported with the [MSYS2](https://www.msys2.org/) environment 
+and `x86_64-pc-windows-gnu` target architecture. 
 
-### Features
+If you have MSYS2 installed and the MSYS `bin` directory in your path, you can
+compile quickjs with `cargo build --target="x86_64-pc-windows-gnu"`. 
 
-The crate supports the following features:
-
-* `chrono`: adds chrono integration
-    - adds a `JsValue::Date` variant that can be (de)serialized to/from a JS `Date`
-* `bigint`: arbitrary precision integer support via [num-bigint](https://github.com/rust-num/num-bigint)
-* `patched`: applies QuickJS patches that can be found in `libquickjs-sys/embed/patches` directory.
-* `log`: allows forwarding `console.log` messages to the `log` crate.
-    Note: must be enabled with `ContextBuilder::console(quick_js::console::LogConsole);`
+The target can also be configured permanently via a 
+[cargo config file](https://doc.rust-lang.org/cargo/reference/config.html) or 
+the `CARGO_BUILD_TARGET` env var.
 
 ### System installation
 
@@ -78,3 +87,5 @@ cd quickjs
 sudo make install
 ```
 
+You then need to disable the `bundled` feature in the `libquickjs-sys` crate to
+force using the system version.
