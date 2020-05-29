@@ -1,5 +1,6 @@
 // imports {{{
 use std;
+use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::ops::{AddAssign, MulAssign, Neg};
 
@@ -61,6 +62,7 @@ impl std::error::Error for Error {}
 
 // ser {{{
 pub struct Serializer {
+    pending_hashmap_key: Option<String>,
     pending_js_value: Vec<JsValue>,
 }
 
@@ -69,6 +71,7 @@ where
     T: Serialize,
 {
     let mut serializer = Serializer {
+        pending_hashmap_key: None,
         pending_js_value: vec![],
     };
     value.serialize(&mut serializer)
@@ -199,7 +202,9 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        todo!()
+        let mut map = HashMap::new();
+        map.insert(variant.into(), value.serialize(self)?);
+        Ok(JsValue::Object(map))
     }
 
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq> {
@@ -233,15 +238,12 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant> {
-        // self.output += "{";
-        // variant.serialize(&mut *self)?;
-        // self.output += ":[";
-        // Ok(self)
-        todo!()
+        self.pending_hashmap_key = Some(variant.into());
+        self.pending_js_value.push(JsValue::Array(vec![]));
+        Ok(self)
     }
 
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap> {
-        use std::collections::HashMap;
         self.pending_js_value.push(JsValue::Object(HashMap::new()));
         Ok(self)
     }
@@ -259,11 +261,9 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStructVariant> {
-        // self.output += "{";
-        // variant.serialize(&mut *self)?;
-        // self.output += ":{";
-        // Ok(self)
-        todo!();
+        self.pending_hashmap_key = Some(variant.into());
+        self.pending_js_value.push(JsValue::Object(HashMap::new()));
+        Ok(self)
     }
 }
 // }}}
@@ -305,17 +305,20 @@ impl<'a> ser::SerializeTuple for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        // if !self.output.ends_with('[') {
-        //     self.output += ",";
-        // }
-        // value.serialize(&mut **self)
-        todo!()
+        let value = value.serialize(&mut **self)?;
+        match &mut self.pending_js_value.last_mut() {
+            Some(JsValue::Array(arr)) => {
+                arr.push(value);
+                Ok(())
+            }
+            _ => return Err(Error::Message("Inner pending value is not an array".into())),
+        }
     }
 
     fn end(self) -> Result<JsValue> {
-        // self.output += "]";
-        // Ok(())
-        todo!()
+        self.pending_js_value
+            .pop()
+            .ok_or(Error::Message("Inner pending value is None".into()))
     }
 }
 // }}}
@@ -365,14 +368,29 @@ impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
         // if !self.output.ends_with('[') {
         //     self.output += ",";
         // }
-        // value.serialize(&mut **self)
-        todo!()
+        let value = value.serialize(&mut **self)?;
+        match self.pending_js_value.last_mut() {
+            Some(JsValue::Array(arr)) => {
+                arr.push(value);
+                Ok(())
+            }
+            _ => return Err(Error::Message("Inner pending value is not an array".into())),
+        }
     }
 
     fn end(self) -> Result<JsValue> {
-        // self.output += "]}";
-        // Ok(())
-        todo!()
+        let value = self
+            .pending_js_value
+            .pop()
+            .ok_or(Error::Message("Inner pending value is None".into()))?;
+        let mut map = HashMap::new();
+        map.insert(
+            self.pending_hashmap_key
+                .take()
+                .ok_or(Error::Message("Inner pending HashMap key is None".into()))?,
+            value,
+        );
+        Ok(JsValue::Object(map))
     }
 }
 // }}}
@@ -482,17 +500,32 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        // if !self.output.ends_with('{') {
-        //     self.output += ",";
-        // }
-        // key.serialize(&mut **self)?;
-        // self.output += ":";
-        // value.serialize(&mut **self)
-        todo!()
+        let value = value.serialize(&mut **self)?;
+        match self.pending_js_value.last_mut() {
+            Some(JsValue::Object(map)) => {
+                map.insert(key.into(), value);
+                Ok(())
+            }
+            _ => {
+                return Err(Error::Message(
+                    "Inner pending value is not an object".into(),
+                ))
+            }
+        }
     }
 
     fn end(self) -> Result<JsValue> {
-        todo!()
+        let key = self
+            .pending_hashmap_key
+            .take()
+            .ok_or(Error::Message("The pending HashMap key is None".into()))?;
+        let value = self
+            .pending_js_value
+            .pop()
+            .ok_or(Error::Message("Inner pending value is None".into()))?;
+        let mut map = HashMap::new();
+        map.insert(key, value);
+        Ok(JsValue::Object(map))
     }
 }
 // }}}
@@ -501,7 +534,6 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
 #[test]
 fn test_struct() {
     use serde::Serialize;
-    use std::collections::HashMap;
 
     #[derive(Serialize)]
     struct Test {
@@ -524,34 +556,49 @@ fn test_struct() {
     );
     let expected = JsValue::Object(map);
     assert_eq!(to_js_value(&test).unwrap(), expected);
+
+    let tuple = (1, 2);
+    let expected = JsValue::Array(vec![JsValue::Int(1), JsValue::Int(2)]);
+    assert_eq!(to_js_value(&tuple).unwrap(), expected);
 }
 
-// #[test]
-// fn test_enum() {
-//     #[derive(Serialize)]
-//     enum E {
-//         Unit,
-//         Newtype(u32),
-//         Tuple(u32, u32),
-//         Struct { a: u32 },
-//     }
-//
-//     let u = E::Unit;
-//     let expected = r#""Unit""#;
-//     assert_eq!(to_js_value(&u).unwrap(), expected);
-//
-//     let n = E::Newtype(1);
-//     let expected = r#"{"Newtype":1}"#;
-//     assert_eq!(to_js_value(&n).unwrap(), expected);
-//
-//     let t = E::Tuple(1, 2);
-//     let expected = r#"{"Tuple":[1,2]}"#;
-//     assert_eq!(to_js_value(&t).unwrap(), expected);
-//
-//     let s = E::Struct { a: 1 };
-//     let expected = r#"{"Struct":{"a":1}}"#;
-//     assert_eq!(to_js_value(&s).unwrap(), expected);
-// }
+#[test]
+fn test_enum() {
+    #[derive(Serialize)]
+    enum E {
+        Unit,
+        Newtype(u32),
+        Tuple(u32, u32),
+        Struct { a: u32 },
+    }
+
+    let u = E::Unit;
+    let expected = JsValue::String("Unit".into());
+    assert_eq!(to_js_value(&u).unwrap(), expected);
+
+    let n = E::Newtype(1);
+    let mut map = HashMap::new();
+    map.insert("Newtype".into(), JsValue::Int(1));
+    let expected = JsValue::Object(map);
+    assert_eq!(to_js_value(&n).unwrap(), expected);
+
+    let t = E::Tuple(1, 2);
+    let mut map = HashMap::new();
+    map.insert(
+        "Tuple".into(),
+        JsValue::Array(vec![JsValue::Int(1), JsValue::Int(2)]),
+    );
+    let expected = JsValue::Object(map);
+    assert_eq!(to_js_value(&t).unwrap(), expected);
+
+    let s = E::Struct { a: 1 };
+    let mut inner_map = HashMap::new();
+    inner_map.insert("a".into(), JsValue::Int(1));
+    let mut map = HashMap::new();
+    map.insert("Struct".into(), JsValue::Object(inner_map));
+    let expected = JsValue::Object(map);
+    assert_eq!(to_js_value(&s).unwrap(), expected);
+}
 // }}}
 // }}}
 
