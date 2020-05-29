@@ -66,6 +66,70 @@ pub struct Serializer {
     pending_js_value: Vec<JsValue>,
 }
 
+// impl Serializer {{{
+impl Serializer {
+    fn serialize_keyvalue_to_pending_map<K: ?Sized, V: ?Sized>(
+        &mut self,
+        key: &K,
+        value: &V,
+    ) -> Result<()>
+    where
+        K: Serialize,
+        V: Serialize,
+    {
+        let key = key.serialize(&mut *self)?;
+        let key_as_string = match key {
+            JsValue::String(s) => s,
+            _ => return Err(Error::Message("Expected key to be a string".into())),
+        };
+        let value = value.serialize(&mut *self)?;
+        match &mut self.pending_js_value.last_mut() {
+            Some(JsValue::Object(map)) => {
+                map.insert(key_as_string, value);
+                Ok(())
+            }
+            _ => {
+                return Err(Error::Message(
+                    "Inner pending object is not a JsValue::Object".into(),
+                ))
+            }
+        }
+    }
+
+    fn end_pending_map(&mut self) -> Result<JsValue> {
+        self.pending_js_value
+            .pop()
+            .ok_or(Error::Message("Inner pending object is None".into()))
+    }
+
+    fn serialize_element_to_pending_array<T>(&mut self, value: &T) -> Result<()>
+    where
+        T: ?Sized + Serialize,
+    {
+        let value = value.serialize(&mut *self)?;
+        match &mut self.pending_js_value.last_mut() {
+            Some(JsValue::Array(arr)) => {
+                arr.push(value);
+                Ok(())
+            }
+            _ => return Err(Error::Message("Inner pending value is not an array".into())),
+        }
+    }
+
+    fn end_pending_array(&mut self) -> Result<JsValue> {
+        self.pending_js_value
+            .pop()
+            .ok_or(Error::Message("Inner pending value is None".into()))
+    }
+
+    fn wrap_in_map_with_key(&self, key: String, value: JsValue) -> JsValue {
+        let mut map = HashMap::new();
+        map.insert(key, value);
+        JsValue::Object(map)
+    }
+}
+// }}}
+
 pub fn to_js_value<T>(value: &T) -> Result<JsValue>
 where
     T: Serialize,
@@ -278,20 +342,11 @@ impl<'a> ser::SerializeSeq for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        let value = value.serialize(&mut **self)?;
-        match &mut self.pending_js_value.last_mut() {
-            Some(JsValue::Array(arr)) => {
-                arr.push(value);
-                Ok(())
-            }
-            _ => return Err(Error::Message("Inner pending value is not an array".into())),
-        }
+        self.serialize_element_to_pending_array(value)
     }
 
     fn end(self) -> Result<JsValue> {
-        self.pending_js_value
-            .pop()
-            .ok_or(Error::Message("Inner pending value is None".into()))
+        self.end_pending_array()
     }
 }
 // }}}
@@ -305,20 +360,11 @@ impl<'a> ser::SerializeTuple for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        let value = value.serialize(&mut **self)?;
-        match &mut self.pending_js_value.last_mut() {
-            Some(JsValue::Array(arr)) => {
-                arr.push(value);
-                Ok(())
-            }
-            _ => return Err(Error::Message("Inner pending value is not an array".into())),
-        }
+        self.serialize_element_to_pending_array(value)
     }
 
     fn end(self) -> Result<JsValue> {
-        self.pending_js_value
-            .pop()
-            .ok_or(Error::Message("Inner pending value is None".into()))
+        self.end_pending_array()
     }
 }
 // }}}
@@ -365,32 +411,16 @@ impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        // if !self.output.ends_with('[') {
-        //     self.output += ",";
-        // }
-        let value = value.serialize(&mut **self)?;
-        match self.pending_js_value.last_mut() {
-            Some(JsValue::Array(arr)) => {
-                arr.push(value);
-                Ok(())
-            }
-            _ => return Err(Error::Message("Inner pending value is not an array".into())),
-        }
+        self.serialize_element_to_pending_array(value)
     }
 
     fn end(self) -> Result<JsValue> {
-        let value = self
-            .pending_js_value
-            .pop()
-            .ok_or(Error::Message("Inner pending value is None".into()))?;
-        let mut map = HashMap::new();
-        map.insert(
-            self.pending_hashmap_key
-                .take()
-                .ok_or(Error::Message("Inner pending HashMap key is None".into()))?,
-            value,
-        );
-        Ok(JsValue::Object(map))
+        let value = self.end_pending_array()?;
+        let key = self
+            .pending_hashmap_key
+            .take()
+            .ok_or(Error::Message("Inner pending HashMap key is None".into()))?;
+        Ok(self.wrap_in_map_with_key(key, value))
     }
 }
 // }}}
@@ -429,29 +459,11 @@ impl<'a> ser::SerializeMap for &'a mut Serializer {
         K: Serialize,
         V: Serialize,
     {
-        let key = key.serialize(&mut **self)?;
-        let key_as_string = match key {
-            JsValue::String(s) => s,
-            _ => return Err(Error::Message("Expected key to be a string".into())),
-        };
-        let value = value.serialize(&mut **self)?;
-        match &mut self.pending_js_value.last_mut() {
-            Some(JsValue::Object(map)) => {
-                map.insert(key_as_string, value);
-                Ok(())
-            }
-            _ => {
-                return Err(Error::Message(
-                    "Inner pending object is not a JsValue::Object".into(),
-                ))
-            }
-        }
+        self.serialize_keyvalue_to_pending_map(key, value)
     }
 
     fn end(self) -> Result<JsValue> {
-        self.pending_js_value
-            .pop()
-            .ok_or(Error::Message("Inner pending object is None".into()))
+        self.end_pending_map()
     }
 }
 // }}}
@@ -467,24 +479,11 @@ impl<'a> ser::SerializeStruct for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        let value = value.serialize(&mut **self)?;
-        match &mut self.pending_js_value.last_mut() {
-            Some(JsValue::Object(map)) => {
-                map.insert(key.into(), value);
-                Ok(())
-            }
-            _ => {
-                return Err(Error::Message(
-                    "Inner pending object is not a JsValue::Object".into(),
-                ))
-            }
-        }
+        self.serialize_keyvalue_to_pending_map(key, value)
     }
 
     fn end(self) -> Result<JsValue> {
-        self.pending_js_value
-            .pop()
-            .ok_or(Error::Message("Inner pending object is None".into()))
+        self.end_pending_map()
     }
 }
 // }}}
@@ -500,18 +499,7 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        let value = value.serialize(&mut **self)?;
-        match self.pending_js_value.last_mut() {
-            Some(JsValue::Object(map)) => {
-                map.insert(key.into(), value);
-                Ok(())
-            }
-            _ => {
-                return Err(Error::Message(
-                    "Inner pending value is not an object".into(),
-                ))
-            }
-        }
+        self.serialize_keyvalue_to_pending_map(key, value)
     }
 
     fn end(self) -> Result<JsValue> {
@@ -519,13 +507,8 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
             .pending_hashmap_key
             .take()
             .ok_or(Error::Message("The pending HashMap key is None".into()))?;
-        let value = self
-            .pending_js_value
-            .pop()
-            .ok_or(Error::Message("Inner pending value is None".into()))?;
-        let mut map = HashMap::new();
-        map.insert(key, value);
-        Ok(JsValue::Object(map))
+        let value = self.end_pending_map()?;
+        Ok(self.wrap_in_map_with_key(key, value))
     }
 }
 // }}}
