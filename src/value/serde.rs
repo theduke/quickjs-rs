@@ -515,7 +515,7 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
 
 // ser tests {{{
 #[test]
-fn test_struct() {
+fn test_ser_struct() {
     use serde::Serialize;
 
     #[derive(Serialize)]
@@ -546,7 +546,7 @@ fn test_struct() {
 }
 
 #[test]
-fn test_enum() {
+fn test_ser_enum() {
     #[derive(Serialize)]
     enum E {
         Unit,
@@ -587,12 +587,14 @@ fn test_enum() {
 
 // de {{{
 pub struct Deserializer<'de> {
-    input: &'de JsValue,
+    pending_js_value: Vec<&'de JsValue>,
 }
 
 impl<'de> Deserializer<'de> {
     pub fn from_js_value(input: &'de JsValue) -> Self {
-        Deserializer { input }
+        Deserializer {
+            pending_js_value: vec![input],
+        }
     }
 }
 
@@ -612,115 +614,164 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        // match self.peek_char()? {
-        //     'n' => self.deserialize_unit(visitor),
-        //     't' | 'f' => self.deserialize_bool(visitor),
-        //     '"' => self.deserialize_str(visitor),
-        //     '0'..='9' => self.deserialize_u64(visitor),
-        //     '-' => self.deserialize_i64(visitor),
-        //     '[' => self.deserialize_seq(visitor),
-        //     '{' => self.deserialize_map(visitor),
-        //     _ => Err(Error::Syntax),
-        // }
-        todo!()
+        match self.pending_js_value.last() {
+            Some(JsValue::Object(map)) => self.deserialize_map(visitor),
+            Some(JsValue::Array(v)) => self.deserialize_seq(visitor),
+            Some(JsValue::String(s)) => self.deserialize_string(visitor),
+            #[cfg(feature = "chrono")]
+            Some(JsValue::Date(d)) => todo!(),
+            #[cfg(feature = "num-bigint")]
+            Some(JsValue::BigInt(bi)) => todo!(),
+            Some(JsValue::Float(f)) => self.deserialize_f64(visitor),
+            Some(JsValue::Int(i)) => self.deserialize_i64(visitor),
+            Some(JsValue::Bool(b)) => self.deserialize_bool(visitor),
+            Some(JsValue::Null) => self.deserialize_option(visitor),
+            _ => return Err(Error::Message("Pending JS Value is invalid".into())),
+        }
     }
 
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_bool(todo!())
+        match self.pending_js_value.last() {
+            Some(JsValue::Bool(b)) => visitor.visit_bool(*b),
+            _ => Err(Error::Message("Expected bool".into())),
+        }
     }
 
     fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_i8(todo!())
+        match self.pending_js_value.last() {
+            Some(JsValue::Int(i)) => visitor.visit_i8(*i as i8),
+            _ => Err(Error::Message("Expected i8".into())),
+        }
     }
 
     fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_i16(todo!())
+        match self.pending_js_value.last() {
+            Some(JsValue::Int(i)) => visitor.visit_i16(*i as i16),
+            _ => Err(Error::Message("Expected i16".into())),
+        }
     }
 
     fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_i32(todo!())
+        match self.pending_js_value.last() {
+            Some(JsValue::Int(i)) => visitor.visit_i32(*i as i32),
+            _ => Err(Error::Message("Expected i32".into())),
+        }
     }
 
     fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_i64(todo!())
+        match self.pending_js_value.last() {
+            Some(JsValue::Int(i)) => visitor.visit_i64(*i as i64),
+            _ => Err(Error::Message("Expected i64".into())),
+        }
     }
 
     fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_u8(todo!())
+        match self.pending_js_value.last() {
+            Some(JsValue::Int(i)) => visitor.visit_u8(*i as u8),
+            _ => Err(Error::Message("Expected u8".into())),
+        }
     }
 
     fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_u16(todo!())
+        match self.pending_js_value.last() {
+            Some(JsValue::Int(i)) => visitor.visit_u16(*i as u16),
+            _ => Err(Error::Message("Expected u16".into())),
+        }
     }
 
     fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_u32(todo!())
+        match self.pending_js_value.last() {
+            Some(JsValue::Int(i)) => visitor.visit_u32(*i as u32),
+            _ => Err(Error::Message("Expected u32".into())),
+        }
     }
 
     fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_u64(todo!())
+        match self.pending_js_value.last() {
+            Some(JsValue::Int(i)) => visitor.visit_u64(*i as u64),
+            _ => Err(Error::Message("Expected u64".into())),
+        }
     }
 
-    fn deserialize_f32<V>(self, _visitor: V) -> Result<V::Value>
+    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        unimplemented!()
+        match self.pending_js_value.last() {
+            Some(JsValue::Int(i)) => visitor.visit_f32(*i as f32),
+            Some(JsValue::Float(f)) => visitor.visit_f32(*f as f32),
+            _ => Err(Error::Message("Expected f32".into())),
+        }
     }
 
-    fn deserialize_f64<V>(self, _visitor: V) -> Result<V::Value>
+    fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        unimplemented!()
+        match self.pending_js_value.last() {
+            Some(JsValue::Int(i)) => visitor.visit_f64(*i as f64),
+            Some(JsValue::Float(f)) => visitor.visit_f64(*f as f64),
+            _ => Err(Error::Message("Expected f64".into())),
+        }
     }
 
-    fn deserialize_char<V>(self, _visitor: V) -> Result<V::Value>
+    fn deserialize_char<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        unimplemented!()
+        match self.pending_js_value.last() {
+            Some(JsValue::String(s)) if s.len() == 1 => {
+                visitor.visit_char(s.chars().nth(0).unwrap() as char)
+            }
+            _ => Err(Error::Message("Expected char".into())),
+        }
     }
 
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_borrowed_str(todo!())
+        match self.pending_js_value.last() {
+            Some(JsValue::String(s)) => visitor.visit_str(s),
+            _ => Err(Error::Message("Expected str".into())),
+        }
     }
 
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        self.deserialize_str(visitor)
+        match self.pending_js_value.last() {
+            Some(JsValue::String(s)) => visitor.visit_string(s.clone()),
+            _ => Err(Error::Message("Expected String".into())),
+        }
     }
 
     fn deserialize_bytes<V>(self, _visitor: V) -> Result<V::Value>
@@ -749,26 +800,20 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        // if self.input.starts_with("null") {
-        //     self.input = &self.input["null".len()..];
-        //     visitor.visit_none()
-        // } else {
-        //     visitor.visit_some(self)
-        // }
-        todo!()
+        match self.pending_js_value.last() {
+            Some(JsValue::Null) => visitor.visit_none(),
+            _ => visitor.visit_some(self),
+        }
     }
 
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        // if self.input.starts_with("null") {
-        //     self.input = &self.input["null".len()..];
-        //     visitor.visit_unit()
-        // } else {
-        //     Err(Error::ExpectedNull)
-        // }
-        todo!()
+        match self.pending_js_value.last() {
+            Some(JsValue::Null) => visitor.visit_none(),
+            _ => Err(Error::Message("Expected ()".into())),
+        }
     }
 
     fn deserialize_unit_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
@@ -808,7 +853,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         // } else {
         //     Err(Error::ExpectedArray)
         // }
-        todo!()
+        match self.pending_js_value.last() {
+            Some(JsValue::Array(vec)) => todo!(),
+            _ => Err(Error::Message("Expected Array".into())),
+        }
     }
 
     // Tuples look just like sequences in JSON. Some formats may be able to
@@ -857,7 +905,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         // } else {
         //     Err(Error::ExpectedMap)
         // }
-        todo!()
+        match self.pending_js_value.last() {
+            Some(JsValue::Object(map)) => todo!(),
+            _ => Err(Error::Message("Expected Object".into())),
+        }
     }
 
     // Structs look just like maps in JSON.
@@ -937,21 +988,53 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 // }}}
 
 // de tests {{{
-// #[test]
-// fn test_struct() {
-//     #[derive(Deserialize, PartialEq, Debug)]
-//     struct Test {
-//         int: u32,
-//         seq: Vec<String>,
-//     }
-//
-//     let j = r#"{"int":1,"seq":["a","b"]}"#;
-//     let expected = Test {
-//         int: 1,
-//         seq: vec!["a".to_owned(), "b".to_owned()],
-//     };
-//     assert_eq!(expected, from_js_value(j).unwrap());
-// }
+#[test]
+fn test_de_primitives() {
+    let i: i8 = from_js_value(&JsValue::Int(12)).unwrap();
+    assert_eq!(i, 12);
+
+    let f: f32 = from_js_value(&JsValue::Int(12)).unwrap();
+    assert_eq!(f, 12f32);
+
+    let f: f32 = from_js_value(&JsValue::Float(3.14f64)).unwrap();
+    assert_eq!(f, 3.14f32);
+
+    let b: bool = from_js_value(&JsValue::Bool(true)).unwrap();
+    assert_eq!(b, true);
+
+    let j = JsValue::String("a".into());
+    let s: String = from_js_value(&j).unwrap();
+    assert_eq!(s, "a".to_string());
+
+    let j = JsValue::String("a".into());
+    let s: &str = from_js_value(&j).unwrap();
+    assert_eq!(s, "a");
+}
+
+#[test]
+fn test_de_struct() {
+    #[derive(Deserialize, PartialEq, Debug)]
+    struct Test {
+        int: u32,
+        seq: Vec<String>,
+    }
+
+    let mut map = HashMap::new();
+    map.insert("int".into(), JsValue::Int(1));
+    map.insert(
+        "seq".into(),
+        JsValue::Array(vec![
+            JsValue::String("a".into()),
+            JsValue::String("b".into()),
+        ]),
+    );
+    let j = JsValue::Object(map);
+    let expected = Test {
+        int: 1,
+        seq: vec!["a".to_owned(), "b".to_owned()],
+    };
+    assert_eq!(expected, from_js_value(&j).unwrap());
+}
 //
 // #[test]
 // fn test_enum() {
