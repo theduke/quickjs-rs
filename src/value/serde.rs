@@ -774,28 +774,20 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         }
     }
 
-    fn deserialize_bytes<V>(self, _visitor: V) -> Result<V::Value>
+    fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        unimplemented!()
+        self.deserialize_seq(visitor)
     }
 
-    fn deserialize_byte_buf<V>(self, _visitor: V) -> Result<V::Value>
+    fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        unimplemented!()
+        self.deserialize_seq(visitor)
     }
 
-    // An absent optional is represented as the JSON `null` and a present
-    // optional is represented as just the contained value.
-    //
-    // As commented in `Serializer` implementation, this is a lossy
-    // representation. For example the values `Some(())` and `None` both
-    // serialize as just `null`. Unfortunately this is typically what people
-    // expect when working with JSON. Other formats are encouraged to behave
-    // more intelligently if possible.
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -840,23 +832,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        // // Parse the opening bracket of the sequence.
-        // if self.next_char()? == '[' {
-        //     // Give the visitor access to each element of the sequence.
-        //     let value = visitor.visit_seq(CommaSeparated::new(&mut self))?;
-        //     // Parse the closing bracket of the sequence.
-        //     if self.next_char()? == ']' {
-        //         Ok(value)
-        //     } else {
-        //         Err(Error::ExpectedArrayEnd)
-        //     }
-        // } else {
-        //     Err(Error::ExpectedArray)
-        // }
-        match self.pending_js_value.last() {
-            Some(JsValue::Array(vec)) => todo!(),
-            _ => Err(Error::Message("Expected Array".into())),
-        }
+        visitor.visit_seq(NestedAccess::new(&mut self))
     }
 
     // Tuples look just like sequences in JSON. Some formats may be able to
@@ -892,23 +868,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        // // Parse the opening brace of the map.
-        // if self.next_char()? == '{' {
-        //     // Give the visitor access to each entry of the map.
-        //     let value = visitor.visit_map(CommaSeparated::new(&mut self))?;
-        //     // Parse the closing brace of the map.
-        //     if self.next_char()? == '}' {
-        //         Ok(value)
-        //     } else {
-        //         Err(Error::ExpectedMapEnd)
-        //     }
-        // } else {
-        //     Err(Error::ExpectedMap)
-        // }
-        match self.pending_js_value.last() {
-            Some(JsValue::Object(map)) => todo!(),
-            _ => Err(Error::Message("Expected Object".into())),
-        }
+        visitor.visit_map(NestedAccess::new(&mut *self))
     }
 
     // Structs look just like maps in JSON.
@@ -987,6 +947,68 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 }
 // }}}
 
+// ArrayAccess {{{
+struct NestedAccess<'a, 'de: 'a> {
+    de: &'a mut Deserializer<'de>,
+    idx: usize,
+}
+
+impl<'a, 'de> NestedAccess<'a, 'de> {
+    pub fn new(de: &'a mut Deserializer<'de>) -> Self {
+        NestedAccess { de, idx: 0 }
+    }
+}
+
+impl<'de, 'a> SeqAccess<'de> for NestedAccess<'a, 'de> {
+    type Error = Error;
+
+    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>>
+    where
+        T: DeserializeSeed<'de>,
+    {
+        let vec = match self.de.pending_js_value.last() {
+            Some(JsValue::Array(vec)) => vec,
+            _ => todo!(),
+        };
+        if self.idx >= vec.len() {
+            Ok(None)
+        } else {
+            self.de.pending_js_value.push(&vec[self.idx]);
+            self.idx += 1;
+            let item = seed.deserialize(&mut *self.de)?; //vec[self.idx];
+            self.de.pending_js_value.pop();
+            Ok(Some(item))
+        }
+    }
+}
+
+impl<'de, 'a> MapAccess<'de> for NestedAccess<'a, 'de> {
+    type Error = Error;
+
+    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>>
+    where
+        K: DeserializeSeed<'de>,
+    {
+        todo!()
+    }
+
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value>
+    where
+        V: DeserializeSeed<'de>,
+    {
+        todo!()
+    }
+
+    fn next_entry_seed<K, V>(&mut self, kseed: K, vseed: V) -> Result<Option<(K::Value, V::Value)>>
+    where
+        K: DeserializeSeed<'de>,
+        V: DeserializeSeed<'de>,
+    {
+        todo!()
+    }
+}
+// }}}
+
 // de tests {{{
 #[test]
 fn test_de_primitives() {
@@ -1005,10 +1027,6 @@ fn test_de_primitives() {
     let j = JsValue::String("a".into());
     let s: String = from_js_value(&j).unwrap();
     assert_eq!(s, "a".to_string());
-
-    let j = JsValue::String("a".into());
-    let s: &str = from_js_value(&j).unwrap();
-    assert_eq!(s, "a");
 }
 
 #[test]
