@@ -947,18 +947,24 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 }
 // }}}
 
-// ArrayAccess {{{
+// NestedAccess {{{
 struct NestedAccess<'a, 'de: 'a> {
     de: &'a mut Deserializer<'de>,
     idx: usize,
+    hash_iter: Option<std::collections::hash_map::Iter<'a, String, JsValue>>,
 }
 
 impl<'a, 'de> NestedAccess<'a, 'de> {
     pub fn new(de: &'a mut Deserializer<'de>) -> Self {
-        NestedAccess { de, idx: 0 }
+        NestedAccess {
+            de,
+            idx: 0,
+            hash_iter: None,
+        }
     }
 }
 
+// impl SeqAccess for NestedAccess {{{
 impl<'de, 'a> SeqAccess<'de> for NestedAccess<'a, 'de> {
     type Error = Error;
 
@@ -981,7 +987,9 @@ impl<'de, 'a> SeqAccess<'de> for NestedAccess<'a, 'de> {
         }
     }
 }
+// }}}
 
+// impl MapAccess for NestedAccess {{{
 impl<'de, 'a> MapAccess<'de> for NestedAccess<'a, 'de> {
     type Error = Error;
 
@@ -989,24 +997,51 @@ impl<'de, 'a> MapAccess<'de> for NestedAccess<'a, 'de> {
     where
         K: DeserializeSeed<'de>,
     {
-        todo!()
+        let map = match self.de.pending_js_value.last() {
+            Some(JsValue::Object(map)) => map,
+            _ => return Err(Error::Message("Expected JsValue::Object".into())),
+        };
+        let mut iter = match self.hash_iter.as_mut() {
+            Some(i) => i.peekable(),
+            None => {
+                let i = map.iter();
+                self.hash_iter = Some(i);
+                self.hash_iter.as_mut().unwrap().peekable()
+            }
+        };
+        match iter.peek() {
+            Some((k, _)) => {
+                let k = (*k).clone();
+                let result = seed.deserialize(k.into_deserializer())?;
+                Ok(Some(result))
+            }
+            None => Ok(None),
+        }
     }
 
     fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value>
     where
         V: DeserializeSeed<'de>,
     {
-        todo!()
-    }
-
-    fn next_entry_seed<K, V>(&mut self, kseed: K, vseed: V) -> Result<Option<(K::Value, V::Value)>>
-    where
-        K: DeserializeSeed<'de>,
-        V: DeserializeSeed<'de>,
-    {
-        todo!()
+        let map = match self.de.pending_js_value.last() {
+            Some(JsValue::Object(map)) => map,
+            _ => unreachable!(),
+        };
+        let mut iter = match self.hash_iter.as_mut() {
+            Some(i) => i,
+            None => unreachable!(),
+        };
+        let value = match iter.next() {
+            Some((_k, v)) => v,
+            None => unreachable!(),
+        };
+        self.de.pending_js_value.push(value);
+        let result = seed.deserialize(self.de)?;
+        self.de.pending_js_value.pop();
+        Ok(result)
     }
 }
+// }}}
 // }}}
 
 // de tests {{{
