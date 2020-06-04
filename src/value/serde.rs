@@ -951,7 +951,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 struct NestedAccess<'a, 'de: 'a> {
     de: &'a mut Deserializer<'de>,
     idx: usize,
-    hash_iter: Option<std::collections::hash_map::Iter<'a, String, JsValue>>,
+    hash_iter: Option<std::collections::hash_map::Iter<'de, String, JsValue>>,
 }
 
 impl<'a, 'de> NestedAccess<'a, 'de> {
@@ -1036,7 +1036,7 @@ impl<'de, 'a> MapAccess<'de> for NestedAccess<'a, 'de> {
             None => unreachable!(),
         };
         self.de.pending_js_value.push(value);
-        let result = seed.deserialize(self.de)?;
+        let result = seed.deserialize(&mut *self.de)?;
         self.de.pending_js_value.pop();
         Ok(result)
     }
