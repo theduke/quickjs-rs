@@ -603,7 +603,9 @@ where
     T: Deserialize<'a>,
 {
     let mut deserializer = Deserializer::from_js_value(val);
-    T::deserialize(&mut deserializer)
+    let result = T::deserialize(&mut deserializer)?;
+    assert_eq!(deserializer.pending_js_value.len(), 1);
+    Ok(result)
 }
 
 // de::Deserializer {{{
@@ -959,7 +961,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 struct NestedAccess<'a, 'de: 'a> {
     de: &'a mut Deserializer<'de>,
     idx: usize,
-    hash_iter: Option<std::collections::hash_map::Iter<'de, String, JsValue>>,
+    hash_iter: Option<std::iter::Peekable<std::collections::hash_map::Iter<'de, String, JsValue>>>,
 }
 
 impl<'a, 'de> NestedAccess<'a, 'de> {
@@ -1010,11 +1012,11 @@ impl<'de, 'a> MapAccess<'de> for NestedAccess<'a, 'de> {
             _ => return Err(Error::Message("Expected JsValue::Object".into())),
         };
         let mut iter = match self.hash_iter.as_mut() {
-            Some(i) => i.peekable(),
+            Some(i) => i,
             None => {
-                let i = map.iter();
+                let i = map.iter().peekable();
                 self.hash_iter = Some(i);
-                self.hash_iter.as_mut().unwrap().peekable()
+                self.hash_iter.as_mut().unwrap()
             }
         };
         match iter.peek() {
@@ -1096,7 +1098,7 @@ fn test_de_struct() {
     };
     assert_eq!(expected, from_js_value(&j).unwrap());
 }
-//
+
 // #[test]
 // fn test_enum() {
 //     #[derive(Deserialize, PartialEq, Debug)]
