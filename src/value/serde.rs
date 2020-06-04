@@ -1,15 +1,12 @@
 // imports {{{
-use std;
-use std::collections::HashMap;
-use std::fmt::{self, Display};
-use std::ops::{AddAssign, MulAssign, Neg};
-
 use serde::de::{
     self, DeserializeSeed, EnumAccess, IntoDeserializer, MapAccess, SeqAccess, VariantAccess,
     Visitor,
 };
 use serde::Deserialize;
 use serde::{ser, Serialize};
+use std::collections::HashMap;
+use std::fmt::{self, Display};
 
 use super::JsValue;
 // }}}
@@ -50,7 +47,7 @@ impl de::Error for Error {
 }
 
 impl Display for Error {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, _formatter: &mut fmt::Formatter) -> fmt::Result {
         match self {
             _ => unimplemented!(),
         }
@@ -88,11 +85,9 @@ impl Serializer {
                 map.insert(key_as_string, value);
                 Ok(())
             }
-            _ => {
-                return Err(Error::Message(
-                    "Inner pending object is not a JsValue::Object".into(),
-                ))
-            }
+            _ => Err(Error::Message(
+                "Inner pending object is not a JsValue::Object".into(),
+            )),
         }
     }
 
@@ -112,7 +107,7 @@ impl Serializer {
                 arr.push(value);
                 Ok(())
             }
-            _ => return Err(Error::Message("Inner pending value is not an array".into())),
+            _ => Err(Error::Message("Inner pending value is not an array".into())),
         }
     }
 
@@ -628,7 +623,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Some(JsValue::Int(i)) => self.deserialize_i64(visitor),
             Some(JsValue::Bool(b)) => self.deserialize_bool(visitor),
             Some(JsValue::Null) => self.deserialize_option(visitor),
-            _ => return Err(Error::Message("Pending JS Value is invalid".into())),
+            _ => Err(Error::Message("Pending JS Value is invalid".into())),
         }
     }
 
@@ -758,7 +753,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         match self.pending_js_value.last() {
             Some(JsValue::String(s)) if s.len() == 1 => {
-                visitor.visit_char(s.chars().nth(0).unwrap() as char)
+                visitor.visit_char(s.chars().next().unwrap() as char)
             }
             _ => Err(Error::Message("Expected char".into())),
         }
