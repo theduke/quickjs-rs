@@ -646,6 +646,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         match self.pending_js_value.last() {
             Some(JsValue::Int(i)) => visitor.visit_i8(*i as i8),
+            Some(JsValue::Float(f)) => visitor.visit_i8(*f as i8),
             _ => Err(Error::Message("Expected i8".into())),
         }
     }
@@ -656,6 +657,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         match self.pending_js_value.last() {
             Some(JsValue::Int(i)) => visitor.visit_i16(*i as i16),
+            Some(JsValue::Float(f)) => visitor.visit_i16(*f as i16),
             _ => Err(Error::Message("Expected i16".into())),
         }
     }
@@ -666,6 +668,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         match self.pending_js_value.last() {
             Some(JsValue::Int(i)) => visitor.visit_i32(*i as i32),
+            Some(JsValue::Float(f)) => visitor.visit_i32(*f as i32),
             _ => Err(Error::Message("Expected i32".into())),
         }
     }
@@ -676,6 +679,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         match self.pending_js_value.last() {
             Some(JsValue::Int(i)) => visitor.visit_i64(*i as i64),
+            Some(JsValue::Float(f)) => visitor.visit_i64(*f as i64),
             _ => Err(Error::Message("Expected i64".into())),
         }
     }
@@ -686,6 +690,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         match self.pending_js_value.last() {
             Some(JsValue::Int(i)) => visitor.visit_u8(*i as u8),
+            Some(JsValue::Float(f)) => visitor.visit_u8(*f as u8),
             _ => Err(Error::Message("Expected u8".into())),
         }
     }
@@ -696,6 +701,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         match self.pending_js_value.last() {
             Some(JsValue::Int(i)) => visitor.visit_u16(*i as u16),
+            Some(JsValue::Float(f)) => visitor.visit_u16(*f as u16),
             _ => Err(Error::Message("Expected u16".into())),
         }
     }
@@ -706,6 +712,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         match self.pending_js_value.last() {
             Some(JsValue::Int(i)) => visitor.visit_u32(*i as u32),
+            Some(JsValue::Float(f)) => visitor.visit_u32(*f as u32),
             _ => Err(Error::Message("Expected u32".into())),
         }
     }
@@ -716,6 +723,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         match self.pending_js_value.last() {
             Some(JsValue::Int(i)) => visitor.visit_u64(*i as u64),
+            Some(JsValue::Float(f)) => visitor.visit_u64(*f as u64),
             _ => Err(Error::Message("Expected u64".into())),
         }
     }
