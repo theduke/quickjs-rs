@@ -763,9 +763,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        match self.pending_js_value.last() {
+        let last = self.pending_js_value.last();
+        match last {
             Some(JsValue::String(s)) => visitor.visit_str(s),
-            _ => Err(Error::Message("Expected str".into())),
+            _ => Err(Error::Message(format!("Expected str, got: {:?}", last))),
         }
     }
 
@@ -869,7 +870,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     // Much like `deserialize_seq` but calls the visitors `visit_map` method
     // with a `MapAccess` implementation, rather than the visitor's `visit_seq`
     // method with a `SeqAccess` implementation.
-    fn deserialize_map<V>(mut self, visitor: V) -> Result<V::Value>
+    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
@@ -903,22 +904,18 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        // if self.peek_char()? == '"' {
-        //     // Visit a unit variant.
-        //     visitor.visit_enum(self.parse_string()?.into_deserializer())
-        // } else if self.next_char()? == '{' {
-        //     // Visit a newtype variant, tuple variant, or struct variant.
-        //     let value = visitor.visit_enum(Enum::new(self))?;
-        //     // Parse the matching close brace.
-        //     if self.next_char()? == '}' {
-        //         Ok(value)
-        //     } else {
-        //         Err(Error::ExpectedMapEnd)
-        //     }
-        // } else {
-        //     Err(Error::ExpectedEnum)
-        // }
-        todo!()
+        match self.pending_js_value.last() {
+            Some(JsValue::String(name)) => visitor.visit_enum(name.clone().into_deserializer()),
+            Some(js_value @ JsValue::Object(..)) => {
+                // re-borrow, to make the borrow-checker happy:
+                let js_value: &JsValue = *self.pending_js_value.last().unwrap();
+                self.pending_js_value.push(dbg!(js_value));
+                let result = visitor.visit_enum(&mut *self);
+                self.pending_js_value.pop();
+                result
+            }
+            _ => todo!(),
+        }
     }
 
     // An identifier in Serde is the type that identifies a field of a struct or
@@ -1006,7 +1003,7 @@ impl<'de, 'a> MapAccess<'de> for NestedAccess<'a, 'de> {
             Some(JsValue::Object(map)) => map,
             _ => return Err(Error::Message("Expected JsValue::Object".into())),
         };
-        let mut iter = match self.hash_iter.as_mut() {
+        let iter = match self.hash_iter.as_mut() {
             Some(i) => i,
             None => {
                 let i = map.iter().peekable();
@@ -1032,7 +1029,7 @@ impl<'de, 'a> MapAccess<'de> for NestedAccess<'a, 'de> {
             Some(JsValue::Object(map)) => map,
             _ => unreachable!(),
         };
-        let mut iter = match self.hash_iter.as_mut() {
+        let iter = match self.hash_iter.as_mut() {
             Some(i) => i,
             None => unreachable!(),
         };
@@ -1047,6 +1044,47 @@ impl<'de, 'a> MapAccess<'de> for NestedAccess<'a, 'de> {
     }
 }
 // }}}
+
+// }}}
+
+// EnumAccess {{{
+impl<'de> EnumAccess<'de> for &mut Deserializer<'de> {
+    type Error = Error;
+    type Variant = Self;
+    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant)>
+    where
+        V: DeserializeSeed<'de>,
+    {
+        Ok((seed.deserialize(&mut *self)?, self))
+    }
+}
+// }}}
+
+// VariantAccess {{{
+impl<'de> VariantAccess<'de> for &mut Deserializer<'de> {
+    type Error = Error;
+    fn unit_variant(self) -> Result<()> {
+        todo!("unit_variant")
+    }
+    fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        todo!("tuple_variant")
+    }
+    fn struct_variant<V>(self, fields: &'static [&'static str], visitor: V) -> Result<V::Value>
+    where
+        V: Visitor<'de>,
+    {
+        todo!("struct_variant")
+    }
+    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value>
+    where
+        T: DeserializeSeed<'de>,
+    {
+        todo!("newtype_variant_seed")
+    }
+}
 // }}}
 
 // de tests {{{
@@ -1067,6 +1105,10 @@ fn test_de_primitives() {
     let j = JsValue::String("a".into());
     let s: String = from_js_value(&j).unwrap();
     assert_eq!(s, "a".to_string());
+
+    // let dt = chrono::Utc::now();
+    // let d: chrono::DateTime<_> = from_js_value(&JsValue::Date(dt)).unwrap();
+    // assert_eq!(d, dt);
 }
 
 #[test]
@@ -1094,31 +1136,33 @@ fn test_de_struct() {
     assert_eq!(expected, from_js_value(&j).unwrap());
 }
 
-// #[test]
-// fn test_enum() {
-//     #[derive(Deserialize, PartialEq, Debug)]
-//     enum E {
-//         Unit,
-//         Newtype(u32),
-//         Tuple(u32, u32),
-//         Struct { a: u32 },
-//     }
-//
-//     let j = r#""Unit""#;
-//     let expected = E::Unit;
-//     assert_eq!(expected, from_js_value(j).unwrap());
-//
-//     let j = r#"{"Newtype":1}"#;
-//     let expected = E::Newtype(1);
-//     assert_eq!(expected, from_js_value(j).unwrap());
-//
-//     let j = r#"{"Tuple":[1,2]}"#;
-//     let expected = E::Tuple(1, 2);
-//     assert_eq!(expected, from_js_value(j).unwrap());
-//
-//     let j = r#"{"Struct":{"a":1}}"#;
-//     let expected = E::Struct { a: 1 };
-//     assert_eq!(expected, from_js_value(j).unwrap());
-// }
+#[test]
+fn test_de_enum() {
+    #[derive(Deserialize, PartialEq, Debug)]
+    enum E {
+        Unit,
+        Newtype(u32),
+        Tuple(u32, u32),
+        Struct { a: u32 },
+    }
+
+    let j = JsValue::String("Unit".into());
+    let expected = E::Unit;
+    assert_eq!(expected, from_js_value(&j).unwrap());
+
+    let mut map = HashMap::new();
+    map.insert("Newtype".into(), JsValue::Int(1));
+    let j = JsValue::Object(map);
+    let expected = E::Newtype(1);
+    assert_eq!(expected, from_js_value(&j).unwrap());
+    //
+    // let j = r#"{"Tuple":[1,2]}"#;
+    // let expected = E::Tuple(1, 2);
+    // assert_eq!(expected, from_js_value(j).unwrap());
+    //
+    // let j = r#"{"Struct":{"a":1}}"#;
+    // let expected = E::Struct { a: 1 };
+    // assert_eq!(expected, from_js_value(j).unwrap());
+}
 // }}}
 // }}}
