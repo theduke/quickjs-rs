@@ -916,15 +916,20 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         match self.pending_value.last() {
-            Some(PendingValue::JsValue(JsValue::String(name))) => visitor.visit_enum(name.clone().into_deserializer()),
-            Some(PendingValue::String(name)) => visitor.visit_enum(name.clone().into_deserializer()),
+            Some(PendingValue::JsValue(JsValue::String(name))) => {
+                visitor.visit_enum(name.clone().into_deserializer())
+            }
+            Some(PendingValue::String(name)) => {
+                visitor.visit_enum(name.clone().into_deserializer())
+            }
             Some(js_value @ PendingValue::JsValue(JsValue::Object(..))) => {
                 // re-borrow, to make the borrow-checker happy:
                 let js_value: &JsValue = *match self.pending_value.last() {
                     Some(PendingValue::JsValue(js_value)) => js_value,
                     _ => unreachable!(),
                 };
-                self.pending_value.push(PendingValue::JsValue(dbg!(js_value)));
+                self.pending_value
+                    .push(PendingValue::JsValue(dbg!(js_value)));
                 let result = visitor.visit_enum(&mut *self);
                 self.pending_value.pop();
                 result
@@ -996,7 +1001,9 @@ impl<'de, 'a> SeqAccess<'de> for NestedAccess<'a, 'de> {
         if self.idx >= vec.len() {
             Ok(None)
         } else {
-            self.de.pending_value.push(PendingValue::JsValue(&vec[self.idx]));
+            self.de
+                .pending_value
+                .push(PendingValue::JsValue(&vec[self.idx]));
             self.idx += 1;
             let item = seed.deserialize(&mut *self.de)?; //vec[self.idx];
             self.de.pending_value.pop();
@@ -1079,7 +1086,7 @@ impl<'de> EnumAccess<'de> for &mut Deserializer<'de> {
                 self.pending_value.push(PendingValue::JsValue(v));
                 Ok((result, self))
             }
-            _ => panic!("Can't handle this yet...")
+            _ => panic!("Can't handle this yet..."),
         }
     }
 }
@@ -1089,19 +1096,23 @@ impl<'de> EnumAccess<'de> for &mut Deserializer<'de> {
 impl<'de> VariantAccess<'de> for &mut Deserializer<'de> {
     type Error = Error;
     fn unit_variant(self) -> Result<()> {
-        todo!("unit_variant")
+        Err(Error::ExpectedString)
     }
     fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        todo!("tuple_variant")
+        let result = de::Deserializer::deserialize_seq(&mut *self, visitor)?;
+        self.pending_value.pop();
+        Ok(result)
     }
     fn struct_variant<V>(self, fields: &'static [&'static str], visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        todo!("struct_variant")
+        let result = de::Deserializer::deserialize_map(&mut *self, visitor)?;
+        self.pending_value.pop();
+        Ok(result)
     }
 
     fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value>
@@ -1189,13 +1200,22 @@ fn test_de_enum() {
     let expected = E::Newtype(1);
     assert_eq!(expected, from_js_value(&j).unwrap());
 
-    // let j = r#"{"Tuple":[1,2]}"#;
-    // let expected = E::Tuple(1, 2);
-    // assert_eq!(expected, from_js_value(j).unwrap());
-    //
-    // let j = r#"{"Struct":{"a":1}}"#;
-    // let expected = E::Struct { a: 1 };
-    // assert_eq!(expected, from_js_value(j).unwrap());
+    let mut map = HashMap::new();
+    map.insert(
+        "Tuple".into(),
+        JsValue::Array(vec![JsValue::Int(1), JsValue::Int(2)]),
+    );
+    let j = JsValue::Object(map);
+    let expected = E::Tuple(1, 2);
+    assert_eq!(expected, from_js_value(&j).unwrap());
+
+    let mut inner_map = HashMap::new();
+    inner_map.insert("a".into(), JsValue::Int(1));
+    let mut map = HashMap::new();
+    map.insert("Struct".into(), JsValue::Object(inner_map));
+    let j = JsValue::Object(map);
+    let expected = E::Struct { a: 1 };
+    assert_eq!(expected, from_js_value(&j).unwrap());
 }
 // }}}
 // }}}
