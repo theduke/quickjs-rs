@@ -1,0 +1,7 @@
+# Configuration for the [cargo-release](https://github.com/sunng87/cargo-release) tool.
+
+pre-release-replacements = [
+  {file="README.md", search="quick-js = .*", replace="{{crate_name}} = \"{{version}}\""},
+]
+
+tag-prefix = "quick-js-"

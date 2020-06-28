@@ -2,7 +2,7 @@
 edition = "2018"
 name = "quick-js"
 description = "QuickJS Javascript engine wrapper"
-version = "0.3.1"
+version = "0.3.4-alpha.0"
 readme = "README.md"
 documentation = "https://docs.rs/quick-js"
 repository = "https://github.com/theduke/quickjs-rs"
@@ -18,7 +18,7 @@ patched = ["libquickjs-sys/patched"]
 bigint = ["num-bigint", "num-traits", "libquickjs-sys/patched"]
 
 [dependencies]
-libquickjs-sys = { version = "> 0.3.0, < 0.6.0", path = "./libquickjs-sys" }
+libquickjs-sys = { version = "> 0.3.0, < 0.7.0", path = "./libquickjs-sys" }
 chrono = { version = "0.4.7", optional = true }
 num-bigint = { version = "0.2.2", optional = true }
 num-traits = { version = "0.2.0", optional = true }

@@ -3,7 +3,6 @@
 pub const _STDIO_H: u32 = 1;
 pub const _FEATURES_H: u32 = 1;
 pub const _DEFAULT_SOURCE: u32 = 1;
-pub const __GLIBC_USE_ISOC2X: u32 = 0;
 pub const __USE_ISOC11: u32 = 1;
 pub const __USE_ISOC99: u32 = 1;
 pub const __USE_ISOC95: u32 = 1;
@@ -28,19 +27,16 @@ pub const __STDC_IEC_559_COMPLEX__: u32 = 1;
 pub const __STDC_ISO_10646__: u32 = 201706;
 pub const __GNU_LIBRARY__: u32 = 6;
 pub const __GLIBC__: u32 = 2;
-pub const __GLIBC_MINOR__: u32 = 31;
+pub const __GLIBC_MINOR__: u32 = 30;
 pub const _SYS_CDEFS_H: u32 = 1;
 pub const __glibc_c99_flexarr_available: u32 = 1;
 pub const __WORDSIZE: u32 = 64;
 pub const __WORDSIZE_TIME64_COMPAT32: u32 = 1;
 pub const __SYSCALL_WORDSIZE: u32 = 64;
-pub const __LONG_DOUBLE_USES_FLOAT128: u32 = 0;
 pub const __HAVE_GENERIC_SELECTION: u32 = 1;
 pub const __GLIBC_USE_LIB_EXT2: u32 = 0;
 pub const __GLIBC_USE_IEC_60559_BFP_EXT: u32 = 0;
-pub const __GLIBC_USE_IEC_60559_BFP_EXT_C2X: u32 = 0;
 pub const __GLIBC_USE_IEC_60559_FUNCS_EXT: u32 = 0;
-pub const __GLIBC_USE_IEC_60559_FUNCS_EXT_C2X: u32 = 0;
 pub const __GLIBC_USE_IEC_60559_TYPES_EXT: u32 = 0;
 pub const __GNUC_VA_LIST: u32 = 1;
 pub const _BITS_TYPES_H: u32 = 1;
@@ -49,7 +45,6 @@ pub const _BITS_TYPESIZES_H: u32 = 1;
 pub const __OFF_T_MATCHES_OFF64_T: u32 = 1;
 pub const __INO_T_MATCHES_INO64_T: u32 = 1;
 pub const __RLIM_T_MATCHES_RLIM64_T: u32 = 1;
-pub const __STATFS_MATCHES_STATFS64: u32 = 1;
 pub const __FD_SETSIZE: u32 = 1024;
 pub const _BITS_TIME64_H: u32 = 1;
 pub const _____fpos_t_defined: u32 = 1;
@@ -168,6 +163,7 @@ pub const JS_DEF_PROP_DOUBLE: u32 = 6;
 pub const JS_DEF_PROP_UNDEFINED: u32 = 7;
 pub const JS_DEF_OBJECT: u32 = 8;
 pub const JS_DEF_ALIAS: u32 = 9;
+pub type size_t = ::std::os::raw::c_ulong;
 pub type va_list = __builtin_va_list;
 pub type __gnuc_va_list = __builtin_va_list;
 pub type __u_char = ::std::os::raw::c_uchar;
@@ -467,7 +463,7 @@ pub struct _IO_FILE {
     pub _wide_data: *mut _IO_wide_data,
     pub _freeres_list: *mut _IO_FILE,
     pub _freeres_buf: *mut ::std::os::raw::c_void,
-    pub __pad5: usize,
+    pub __pad5: size_t,
     pub _mode: ::std::os::raw::c_int,
     pub _unused2: [::std::os::raw::c_char; 20usize],
 }
@@ -775,6 +771,7 @@ fn bindgen_test_layout__IO_FILE() {
     );
 }
 pub type off_t = __off_t;
+pub type ssize_t = __ssize_t;
 pub type fpos_t = __fpos_t;
 extern "C" {
     pub static mut stdin: *mut FILE;
@@ -846,14 +843,14 @@ extern "C" {
 extern "C" {
     pub fn fmemopen(
         __s: *mut ::std::os::raw::c_void,
-        __len: usize,
+        __len: size_t,
         __modes: *const ::std::os::raw::c_char,
     ) -> *mut FILE;
 }
 extern "C" {
     pub fn open_memstream(
         __bufloc: *mut *mut ::std::os::raw::c_char,
-        __sizeloc: *mut usize,
+        __sizeloc: *mut size_t,
     ) -> *mut FILE;
 }
 extern "C" {
@@ -864,11 +861,11 @@ extern "C" {
         __stream: *mut FILE,
         __buf: *mut ::std::os::raw::c_char,
         __modes: ::std::os::raw::c_int,
-        __n: usize,
+        __n: size_t,
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn setbuffer(__stream: *mut FILE, __buf: *mut ::std::os::raw::c_char, __size: usize);
+    pub fn setbuffer(__stream: *mut FILE, __buf: *mut ::std::os::raw::c_char, __size: size_t);
 }
 extern "C" {
     pub fn setlinebuf(__stream: *mut FILE);
@@ -1073,7 +1070,7 @@ extern "C" {
 extern "C" {
     pub fn __getdelim(
         __lineptr: *mut *mut ::std::os::raw::c_char,
-        __n: *mut usize,
+        __n: *mut size_t,
         __delimiter: ::std::os::raw::c_int,
         __stream: *mut FILE,
     ) -> __ssize_t;
@@ -1081,7 +1078,7 @@ extern "C" {
 extern "C" {
     pub fn getdelim(
         __lineptr: *mut *mut ::std::os::raw::c_char,
-        __n: *mut usize,
+        __n: *mut size_t,
         __delimiter: ::std::os::raw::c_int,
         __stream: *mut FILE,
     ) -> __ssize_t;
@@ -1089,7 +1086,7 @@ extern "C" {
 extern "C" {
     pub fn getline(
         __lineptr: *mut *mut ::std::os::raw::c_char,
-        __n: *mut usize,
+        __n: *mut size_t,
         __stream: *mut FILE,
     ) -> __ssize_t;
 }
@@ -1121,18 +1118,18 @@ extern "C" {
 extern "C" {
     pub fn fread_unlocked(
         __ptr: *mut ::std::os::raw::c_void,
-        __size: usize,
-        __n: usize,
+        __size: size_t,
+        __n: size_t,
         __stream: *mut FILE,
-    ) -> usize;
+    ) -> size_t;
 }
 extern "C" {
     pub fn fwrite_unlocked(
         __ptr: *const ::std::os::raw::c_void,
-        __size: usize,
-        __n: usize,
+        __size: size_t,
+        __n: size_t,
         __stream: *mut FILE,
-    ) -> usize;
+    ) -> size_t;
 }
 extern "C" {
     pub fn fseek(
@@ -1429,9 +1426,9 @@ pub type JSCFunctionData = ::std::option::Option<
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct JSMallocState {
-    pub malloc_count: usize,
-    pub malloc_size: usize,
-    pub malloc_limit: usize,
+    pub malloc_count: size_t,
+    pub malloc_size: size_t,
+    pub malloc_limit: size_t,
     pub opaque: *mut ::std::os::raw::c_void,
 }
 #[test]
@@ -1491,7 +1488,7 @@ fn bindgen_test_layout_JSMallocState() {
 #[derive(Debug, Copy, Clone)]
 pub struct JSMallocFunctions {
     pub js_malloc: ::std::option::Option<
-        unsafe extern "C" fn(s: *mut JSMallocState, size: usize) -> *mut ::std::os::raw::c_void,
+        unsafe extern "C" fn(s: *mut JSMallocState, size: size_t) -> *mut ::std::os::raw::c_void,
     >,
     pub js_free: ::std::option::Option<
         unsafe extern "C" fn(s: *mut JSMallocState, ptr: *mut ::std::os::raw::c_void),
@@ -1500,11 +1497,11 @@ pub struct JSMallocFunctions {
         unsafe extern "C" fn(
             s: *mut JSMallocState,
             ptr: *mut ::std::os::raw::c_void,
-            size: usize,
+            size: size_t,
         ) -> *mut ::std::os::raw::c_void,
     >,
     pub js_malloc_usable_size:
-        ::std::option::Option<unsafe extern "C" fn(ptr: *const ::std::os::raw::c_void) -> usize>,
+        ::std::option::Option<unsafe extern "C" fn(ptr: *const ::std::os::raw::c_void) -> size_t>,
 }
 #[test]
 fn bindgen_test_layout_JSMallocFunctions() {
@@ -1573,10 +1570,13 @@ extern "C" {
     pub fn JS_SetRuntimeInfo(rt: *mut JSRuntime, info: *const ::std::os::raw::c_char);
 }
 extern "C" {
-    pub fn JS_SetMemoryLimit(rt: *mut JSRuntime, limit: usize);
+    pub fn JS_SetMemoryLimit(rt: *mut JSRuntime, limit: size_t);
 }
 extern "C" {
-    pub fn JS_SetGCThreshold(rt: *mut JSRuntime, gc_threshold: usize);
+    pub fn JS_SetGCThreshold(rt: *mut JSRuntime, gc_threshold: size_t);
+}
+extern "C" {
+    pub fn JS_SetMaxStackSize(rt: *mut JSRuntime, stack_size: size_t);
 }
 extern "C" {
     pub fn JS_NewRuntime2(
@@ -1611,6 +1611,9 @@ extern "C" {
     pub fn JS_FreeContext(s: *mut JSContext);
 }
 extern "C" {
+    pub fn JS_DupContext(ctx: *mut JSContext) -> *mut JSContext;
+}
+extern "C" {
     pub fn JS_GetContextOpaque(ctx: *mut JSContext) -> *mut ::std::os::raw::c_void;
 }
 extern "C" {
@@ -1618,9 +1621,6 @@ extern "C" {
 }
 extern "C" {
     pub fn JS_GetRuntime(ctx: *mut JSContext) -> *mut JSRuntime;
-}
-extern "C" {
-    pub fn JS_SetMaxStackSize(ctx: *mut JSContext, stack_size: usize);
 }
 extern "C" {
     pub fn JS_SetClassProto(ctx: *mut JSContext, class_id: JSClassID, obj: JSValue);
@@ -1688,7 +1688,7 @@ extern "C" {
     ) -> JSValue;
 }
 extern "C" {
-    pub fn js_malloc_rt(rt: *mut JSRuntime, size: usize) -> *mut ::std::os::raw::c_void;
+    pub fn js_malloc_rt(rt: *mut JSRuntime, size: size_t) -> *mut ::std::os::raw::c_void;
 }
 extern "C" {
     pub fn js_free_rt(rt: *mut JSRuntime, ptr: *mut ::std::os::raw::c_void);
@@ -1697,20 +1697,20 @@ extern "C" {
     pub fn js_realloc_rt(
         rt: *mut JSRuntime,
         ptr: *mut ::std::os::raw::c_void,
-        size: usize,
+        size: size_t,
     ) -> *mut ::std::os::raw::c_void;
 }
 extern "C" {
     pub fn js_malloc_usable_size_rt(
         rt: *mut JSRuntime,
         ptr: *const ::std::os::raw::c_void,
-    ) -> usize;
+    ) -> size_t;
 }
 extern "C" {
-    pub fn js_mallocz_rt(rt: *mut JSRuntime, size: usize) -> *mut ::std::os::raw::c_void;
+    pub fn js_mallocz_rt(rt: *mut JSRuntime, size: size_t) -> *mut ::std::os::raw::c_void;
 }
 extern "C" {
-    pub fn js_malloc(ctx: *mut JSContext, size: usize) -> *mut ::std::os::raw::c_void;
+    pub fn js_malloc(ctx: *mut JSContext, size: size_t) -> *mut ::std::os::raw::c_void;
 }
 extern "C" {
     pub fn js_free(ctx: *mut JSContext, ptr: *mut ::std::os::raw::c_void);
@@ -1719,22 +1719,23 @@ extern "C" {
     pub fn js_realloc(
         ctx: *mut JSContext,
         ptr: *mut ::std::os::raw::c_void,
-        size: usize,
+        size: size_t,
     ) -> *mut ::std::os::raw::c_void;
 }
 extern "C" {
-    pub fn js_malloc_usable_size(ctx: *mut JSContext, ptr: *const ::std::os::raw::c_void) -> usize;
+    pub fn js_malloc_usable_size(ctx: *mut JSContext, ptr: *const ::std::os::raw::c_void)
+        -> size_t;
 }
 extern "C" {
     pub fn js_realloc2(
         ctx: *mut JSContext,
         ptr: *mut ::std::os::raw::c_void,
-        size: usize,
-        pslack: *mut usize,
+        size: size_t,
+        pslack: *mut size_t,
     ) -> *mut ::std::os::raw::c_void;
 }
 extern "C" {
-    pub fn js_mallocz(ctx: *mut JSContext, size: usize) -> *mut ::std::os::raw::c_void;
+    pub fn js_mallocz(ctx: *mut JSContext, size: size_t) -> *mut ::std::os::raw::c_void;
 }
 extern "C" {
     pub fn js_strdup(
@@ -1746,7 +1747,7 @@ extern "C" {
     pub fn js_strndup(
         ctx: *mut JSContext,
         s: *const ::std::os::raw::c_char,
-        n: usize,
+        n: size_t,
     ) -> *mut ::std::os::raw::c_char;
 }
 #[repr(C)]
@@ -2072,7 +2073,7 @@ extern "C" {
     pub fn JS_NewAtomLen(
         ctx: *mut JSContext,
         str: *const ::std::os::raw::c_char,
-        len: usize,
+        len: size_t,
     ) -> JSAtom;
 }
 extern "C" {
@@ -2563,7 +2564,7 @@ extern "C" {
     pub fn JS_NewStringLen(
         ctx: *mut JSContext,
         str1: *const ::std::os::raw::c_char,
-        len1: usize,
+        len1: size_t,
     ) -> JSValue;
 }
 extern "C" {
@@ -2581,7 +2582,7 @@ extern "C" {
 extern "C" {
     pub fn JS_ToCStringLen2(
         ctx: *mut JSContext,
-        plen: *mut usize,
+        plen: *mut size_t,
         val1: JSValue,
         cesu8: ::std::os::raw::c_int,
     ) -> *const ::std::os::raw::c_char;
@@ -2762,14 +2763,14 @@ extern "C" {
 extern "C" {
     pub fn JS_DetectModule(
         input: *const ::std::os::raw::c_char,
-        input_len: usize,
+        input_len: size_t,
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn JS_Eval(
         ctx: *mut JSContext,
         input: *const ::std::os::raw::c_char,
-        input_len: usize,
+        input_len: size_t,
         filename: *const ::std::os::raw::c_char,
         eval_flags: ::std::os::raw::c_int,
     ) -> JSValue;
@@ -2852,7 +2853,7 @@ extern "C" {
     pub fn JS_ParseJSON(
         ctx: *mut JSContext,
         buf: *const ::std::os::raw::c_char,
-        buf_len: usize,
+        buf_len: size_t,
         filename: *const ::std::os::raw::c_char,
     ) -> JSValue;
 }
@@ -2875,28 +2876,28 @@ extern "C" {
     pub fn JS_NewArrayBuffer(
         ctx: *mut JSContext,
         buf: *mut u8,
-        len: usize,
+        len: size_t,
         free_func: JSFreeArrayBufferDataFunc,
         opaque: *mut ::std::os::raw::c_void,
         is_shared: ::std::os::raw::c_int,
     ) -> JSValue;
 }
 extern "C" {
-    pub fn JS_NewArrayBufferCopy(ctx: *mut JSContext, buf: *const u8, len: usize) -> JSValue;
+    pub fn JS_NewArrayBufferCopy(ctx: *mut JSContext, buf: *const u8, len: size_t) -> JSValue;
 }
 extern "C" {
     pub fn JS_DetachArrayBuffer(ctx: *mut JSContext, obj: JSValue);
 }
 extern "C" {
-    pub fn JS_GetArrayBuffer(ctx: *mut JSContext, psize: *mut usize, obj: JSValue) -> *mut u8;
+    pub fn JS_GetArrayBuffer(ctx: *mut JSContext, psize: *mut size_t, obj: JSValue) -> *mut u8;
 }
 extern "C" {
     pub fn JS_GetTypedArrayBuffer(
         ctx: *mut JSContext,
         obj: JSValue,
-        pbyte_offset: *mut usize,
-        pbyte_length: *mut usize,
-        pbytes_per_element: *mut usize,
+        pbyte_offset: *mut size_t,
+        pbyte_length: *mut size_t,
+        pbytes_per_element: *mut size_t,
     ) -> JSValue;
 }
 extern "C" {
@@ -2995,7 +2996,7 @@ extern "C" {
 extern "C" {
     pub fn JS_WriteObject(
         ctx: *mut JSContext,
-        psize: *mut usize,
+        psize: *mut size_t,
         obj: JSValue,
         flags: ::std::os::raw::c_int,
     ) -> *mut u8;
@@ -3004,7 +3005,7 @@ extern "C" {
     pub fn JS_ReadObject(
         ctx: *mut JSContext,
         buf: *const u8,
-        buf_len: usize,
+        buf_len: size_t,
         flags: ::std::os::raw::c_int,
     ) -> JSValue;
 }

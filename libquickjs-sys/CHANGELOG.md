@@ -1,5 +1,11 @@
 # libquickjs_sys - Changelog
 
+## v0.6.0 - 2020-05-25
+
+Upgraded to quickjs version `2020-04-12`.
+
+* Lot's of changes from `usize` to `size_t`.
+
 ## v0.5.0 - 2020-03-24
 
 Upgraded to version `2020-03-16`:
