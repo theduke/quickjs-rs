@@ -2,6 +2,10 @@
 
 ## Master branch
 
+## v0.3.4 - 2020-07-09
+
+* Bump quickjs to 2020-07-05
+
 ## v0.3.3 - 2020-05-27
 
 * Add Windows support

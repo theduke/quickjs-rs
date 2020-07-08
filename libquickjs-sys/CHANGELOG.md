@@ -1,8 +1,10 @@
 # libquickjs_sys - Changelog
 
-## unreleased
+## v0.7.0 - 2020-07-09
 
-* Added 
+Upgraded to quickjs version `2020-07-05`.
+
+* Added
   - JS_ParseJSON2
   - JSSharedArrayBufferFunctions
   - JS_WriteObject2
