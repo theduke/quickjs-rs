@@ -149,10 +149,15 @@ pub const JS_GPN_SYMBOL_MASK: u32 = 2;
 pub const JS_GPN_PRIVATE_MASK: u32 = 4;
 pub const JS_GPN_ENUM_ONLY: u32 = 16;
 pub const JS_GPN_SET_ENUM: u32 = 32;
+pub const JS_PARSE_JSON_EXT: u32 = 1;
 pub const JS_WRITE_OBJ_BYTECODE: u32 = 1;
 pub const JS_WRITE_OBJ_BSWAP: u32 = 2;
+pub const JS_WRITE_OBJ_SAB: u32 = 4;
+pub const JS_WRITE_OBJ_REFERENCE: u32 = 8;
 pub const JS_READ_OBJ_BYTECODE: u32 = 1;
 pub const JS_READ_OBJ_ROM_DATA: u32 = 2;
+pub const JS_READ_OBJ_SAB: u32 = 4;
+pub const JS_READ_OBJ_REFERENCE: u32 = 8;
 pub const JS_DEF_CFUNC: u32 = 0;
 pub const JS_DEF_CGETSET: u32 = 1;
 pub const JS_DEF_CGETSET_MAGIC: u32 = 2;
@@ -2858,6 +2863,15 @@ extern "C" {
     ) -> JSValue;
 }
 extern "C" {
+    pub fn JS_ParseJSON2(
+        ctx: *mut JSContext,
+        buf: *const ::std::os::raw::c_char,
+        buf_len: size_t,
+        filename: *const ::std::os::raw::c_char,
+        flags: ::std::os::raw::c_int,
+    ) -> JSValue;
+}
+extern "C" {
     pub fn JS_JSONStringify(
         ctx: *mut JSContext,
         obj: JSValue,
@@ -2899,6 +2913,90 @@ extern "C" {
         pbyte_length: *mut size_t,
         pbytes_per_element: *mut size_t,
     ) -> JSValue;
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct JSSharedArrayBufferFunctions {
+    pub sab_alloc: ::std::option::Option<
+        unsafe extern "C" fn(
+            opaque: *mut ::std::os::raw::c_void,
+            size: size_t,
+        ) -> *mut ::std::os::raw::c_void,
+    >,
+    pub sab_free: ::std::option::Option<
+        unsafe extern "C" fn(opaque: *mut ::std::os::raw::c_void, ptr: *mut ::std::os::raw::c_void),
+    >,
+    pub sab_dup: ::std::option::Option<
+        unsafe extern "C" fn(opaque: *mut ::std::os::raw::c_void, ptr: *mut ::std::os::raw::c_void),
+    >,
+    pub sab_opaque: *mut ::std::os::raw::c_void,
+}
+#[test]
+fn bindgen_test_layout_JSSharedArrayBufferFunctions() {
+    assert_eq!(
+        ::std::mem::size_of::<JSSharedArrayBufferFunctions>(),
+        32usize,
+        concat!("Size of: ", stringify!(JSSharedArrayBufferFunctions))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<JSSharedArrayBufferFunctions>(),
+        8usize,
+        concat!("Alignment of ", stringify!(JSSharedArrayBufferFunctions))
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::std::ptr::null::<JSSharedArrayBufferFunctions>())).sab_alloc as *const _ as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(JSSharedArrayBufferFunctions),
+            "::",
+            stringify!(sab_alloc)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::std::ptr::null::<JSSharedArrayBufferFunctions>())).sab_free as *const _ as usize
+        },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(JSSharedArrayBufferFunctions),
+            "::",
+            stringify!(sab_free)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::std::ptr::null::<JSSharedArrayBufferFunctions>())).sab_dup as *const _ as usize
+        },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(JSSharedArrayBufferFunctions),
+            "::",
+            stringify!(sab_dup)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::std::ptr::null::<JSSharedArrayBufferFunctions>())).sab_opaque as *const _ as usize
+        },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(JSSharedArrayBufferFunctions),
+            "::",
+            stringify!(sab_opaque)
+        )
+    );
+}
+extern "C" {
+    pub fn JS_SetSharedArrayBufferFunctions(
+        rt: *mut JSRuntime,
+        sf: *const JSSharedArrayBufferFunctions,
+    );
 }
 extern "C" {
     pub fn JS_NewPromiseCapability(ctx: *mut JSContext, resolving_funcs: *mut JSValue) -> JSValue;
@@ -2999,6 +3097,16 @@ extern "C" {
         psize: *mut size_t,
         obj: JSValue,
         flags: ::std::os::raw::c_int,
+    ) -> *mut u8;
+}
+extern "C" {
+    pub fn JS_WriteObject2(
+        ctx: *mut JSContext,
+        psize: *mut size_t,
+        obj: JSValue,
+        flags: ::std::os::raw::c_int,
+        psab_tab: *mut *mut *mut u8,
+        psab_tab_len: *mut size_t,
     ) -> *mut u8;
 }
 extern "C" {
