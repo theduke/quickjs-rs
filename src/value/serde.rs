@@ -373,17 +373,21 @@ impl<'a> ser::SerializeTupleStruct for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        // if !self.output.ends_with('[') {
-        //     self.output += ",";
-        // }
-        // value.serialize(&mut **self)
-        todo!()
+        let serialized = value.serialize(&mut **self)?;
+        match self.pending_js_value.last_mut() {
+            Some(JsValue::Array(vec)) => {
+                vec.push(serialized);
+                Ok(())
+            }
+            _ => return Err(Error::Message(format!("Expected pending to be an Array"))),
+        }
     }
 
     fn end(self) -> Result<JsValue> {
-        // self.output += "]";
-        // Ok(())
-        todo!()
+        match self.pending_js_value.pop() {
+            Some(v) => Ok(v),
+            None => Err(Error::Message(format!("No pending value"))),
+        }
     }
 }
 // }}}
@@ -538,6 +542,13 @@ fn test_ser_struct() {
     let tuple = (1, 2);
     let expected = JsValue::Array(vec![JsValue::Int(1), JsValue::Int(2)]);
     assert_eq!(to_js_value(&tuple).unwrap(), expected);
+
+    #[derive(Serialize)]
+    struct TestTupleStruct(u32, u32);
+
+    let js_value = to_js_value(&TestTupleStruct(1, 2)).unwrap();
+    let expected = JsValue::Array(vec![JsValue::Int(1), JsValue::Int(2)]);
+    assert_eq!(js_value, expected);
 }
 
 #[test]
@@ -1176,6 +1187,12 @@ fn test_de_struct() {
         seq: vec!["a".to_owned(), "b".to_owned()],
     };
     assert_eq!(expected, from_js_value(&j).unwrap());
+
+    #[derive(Deserialize, PartialEq, Debug)]
+    struct TestTupleStruct(u32, u32);
+
+    let j = JsValue::Array(vec![JsValue::Int(1), JsValue::Int(2)]);
+    assert_eq!(TestTupleStruct(1, 2), from_js_value(&j).unwrap());
 }
 // }}}
 
