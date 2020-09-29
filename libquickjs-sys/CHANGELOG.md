@@ -1,5 +1,18 @@
 # libquickjs_sys - Changelog
 
+
+## v0.7.0 - 2020-09-29
+
+Upgraded to quickjs version `2020-09-06`.
+
+* Added
+  - JS_SetIsHTMLDDA
+  - JS_GetScriptOrModuleName
+  - JS_RunModule
+  - Multiple new constants, including `JS_ATOM_NULL`
+
+JS_SetIsHTMLDDA
+
 ## v0.7.0 - 2020-07-09
 
 Upgraded to quickjs version `2020-07-05`.
