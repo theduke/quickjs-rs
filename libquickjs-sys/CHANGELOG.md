@@ -1,7 +1,7 @@
 # libquickjs_sys - Changelog
 
 
-## v0.7.0 - 2020-09-29
+## v0.8.0 - 2020-09-29
 
 Upgraded to quickjs version `2020-09-06`.
 
