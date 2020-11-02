@@ -79,6 +79,7 @@ mod log {
 
     fn print_value(value: JsValue) -> String {
         match value {
+            JsValue::Undefined => "undefined".to_string(),
             JsValue::Null => "null".to_string(),
             JsValue::Bool(v) => v.to_string(),
             JsValue::Int(v) => v.to_string(),

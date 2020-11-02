@@ -122,7 +122,7 @@ where
 
     fn call(&self, args: Vec<JsValue>) -> Result<Result<JsValue, String>, ValueError> {
         (self)(Arguments(args));
-        Ok(Ok(JsValue::Null))
+        Ok(Ok(JsValue::Undefined))
     }
 }
 

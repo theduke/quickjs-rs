@@ -87,6 +87,10 @@ fn js_create_bigint_function(context: *mut q::JSContext) -> q::JSValue {
 /// Serialize a Rust value into a quickjs runtime value.
 fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSValue, ValueError> {
     let v = match value {
+        JsValue::Undefined => q::JSValue {
+            u: q::JSValueUnion { int32: 0 },
+            tag: TAG_UNDEFINED,
+        },
         JsValue::Null => q::JSValue {
             u: q::JSValueUnion { int32: 0 },
             tag: TAG_NULL,
@@ -408,7 +412,7 @@ fn deserialize_value(
         // Null.
         TAG_NULL => Ok(JsValue::Null),
         // Undefined.
-        TAG_UNDEFINED => Ok(JsValue::Null),
+        TAG_UNDEFINED => Ok(JsValue::Undefined),
         // Float.
         TAG_FLOAT64 => {
             let val = unsafe { r.u.float64 };
