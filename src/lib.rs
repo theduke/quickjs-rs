@@ -385,6 +385,7 @@ mod tests {
         let c = Context::new().unwrap();
 
         let cases = vec![
+            ("undefined", Ok(JsValue::Undefined)),
             ("null", Ok(JsValue::Null)),
             ("true", Ok(JsValue::Bool(true))),
             ("2 > 10", Ok(JsValue::Bool(false))),
@@ -405,11 +406,11 @@ mod tests {
 
         let obj_cases = vec![
             (
-                r#" {"a": null} "#,
-                Ok(JsValue::Object(HashMap::from_iter(vec![(
-                    "a".to_string(),
-                    JsValue::Null,
-                )]))),
+                r#" {"a": null, "b": undefined} "#,
+                Ok(JsValue::Object(HashMap::from_iter(vec![
+                    ("a".to_string(), JsValue::Null),
+                    ("b".to_string(), JsValue::Undefined),
+                ]))),
             ),
             (
                 r#" {a: 1, b: true, c: {c1: false}} "#,
@@ -706,7 +707,7 @@ mod tests {
             );
         })
         .unwrap();
-        c.eval(" cb('hello', true, 100) ").unwrap();
+        assert_eq!(c.eval_as::<bool>("cb('hello', true, 100) === undefined").unwrap(), true);
 
         // With return.
         c.add_callback("cb2", |args: Arguments| -> u32 {

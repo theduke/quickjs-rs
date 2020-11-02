@@ -11,6 +11,7 @@ pub use bigint::BigInt;
 #[derive(PartialEq, Clone, Debug)]
 #[allow(missing_docs)]
 pub enum JsValue {
+    Undefined,
     Null,
     Bool(bool),
     Int(i32),
