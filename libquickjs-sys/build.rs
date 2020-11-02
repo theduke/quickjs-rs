@@ -117,6 +117,7 @@ fn main() {
         // platforms.
         .flag_if_supported("-Wno-cast-function-type")
         .flag_if_supported("-Wno-implicit-fallthrough")
+        .flag_if_supported("-Wno-enum-conversion")
         // cc uses the OPT_LEVEL env var by default, but we hardcode it to -O2
         // since release builds use -O3 which might be problematic for quickjs,
         // and debug builds only happen once anyway so the optimization slowdown
