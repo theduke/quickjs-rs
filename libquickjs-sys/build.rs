@@ -24,6 +24,11 @@ fn main() {
     #[cfg(feature = "patched")]
     panic!("Invalid configuration for libquickjs-sys: the patched feature is incompatible with the system feature");
 
+    // compile statics
+    cc::Build::new()
+        .file("static-functions.c")
+        .compile("libquickjs-static-functions.a");
+
     let lib: std::borrow::Cow<str> = if let Ok(lib) = env::var("QUICKJS_LIBRARY_PATH") {
         lib.into()
     } else if cfg!(unix) {
@@ -57,6 +62,11 @@ fn main() {
 
 #[cfg(feature = "bundled")]
 fn main() {
+    // compile statics
+    cc::Build::new()
+        .file("static-functions.c")
+        .compile("libquickjs-static-functions.a");
+
     let embed_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("embed");
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
