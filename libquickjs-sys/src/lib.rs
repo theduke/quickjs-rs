@@ -19,24 +19,39 @@ extern "C" {
     fn JS_NewFloat64_real(ctx: *mut JSContext, v: f64) -> JSValue;
 }
 
-pub fn JS_DupValue(ctx: *mut JSContext, v: JSValue) {
-    unsafe {JS_DupValue_real(ctx, v)};
+/// Increment the refcount of this value
+/// # Safety
+/// be safe
+pub unsafe fn JS_DupValue(ctx: *mut JSContext, v: JSValue) {
+    JS_DupValue_real(ctx, v);
 }
 
-pub fn JS_FreeValue(ctx: *mut JSContext, v: JSValue) {
-    unsafe {JS_FreeValue_real(ctx, v)};
+/// Decrement the refcount of this value
+/// # Safety
+/// be safe
+pub unsafe fn JS_FreeValue(ctx: *mut JSContext, v: JSValue) {
+    JS_FreeValue_real(ctx, v);
 }
 
-pub fn JS_NewBool(ctx: *mut JSContext, v: bool) -> JSValue {
-    unsafe {JS_NewBool_real(ctx, v)}
+/// create a new boolean value
+/// # Safety
+/// be safe
+pub unsafe fn JS_NewBool(ctx: *mut JSContext, v: bool) -> JSValue {
+    JS_NewBool_real(ctx, v)
 }
 
-pub fn JS_NewInt32(ctx: *mut JSContext, v: i32) -> JSValue {
-    unsafe {JS_NewInt32_real(ctx, v)}
+/// create a new int32 value
+/// # Safety
+/// be safe
+pub unsafe fn JS_NewInt32(ctx: *mut JSContext, v: i32) -> JSValue {
+    JS_NewInt32_real(ctx, v)
 }
 
-pub fn JS_NewFloat64(ctx: *mut JSContext, v: f64) -> JSValue {
-    unsafe {JS_NewFloat64_real(ctx, v)}
+/// create a new f64 value, please note that if the passed f64 fits in a i32 this will return a value with flag 0 (i32)
+/// # Safety
+/// be safe
+pub unsafe fn JS_NewFloat64(ctx: *mut JSContext, v: f64) -> JSValue {
+    JS_NewFloat64_real(ctx, v)
 }
 
 #[cfg(test)]
@@ -49,8 +64,6 @@ mod tests {
     #[test]
     fn test_eval() {
         unsafe {
-
-
 
             let rt = JS_NewRuntime();
             let ctx = JS_NewContext(rt);
