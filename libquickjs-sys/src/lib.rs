@@ -64,7 +64,6 @@ mod tests {
     #[test]
     fn test_eval() {
         unsafe {
-
             let rt = JS_NewRuntime();
             let ctx = JS_NewContext(rt);
 
@@ -91,7 +90,6 @@ mod tests {
             assert_eq!(fval.tag, 7);
             let bval = JS_NewBool(ctx, true);
             assert_eq!(bval.tag, 1);
-
         }
     }
 }
