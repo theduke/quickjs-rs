@@ -11,48 +11,7 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 // import the functions from static-functions.c
 
-extern "C" {
-    fn JS_DupValue_real(ctx: *mut JSContext, v: JSValue);
-    fn JS_FreeValue_real(ctx: *mut JSContext, v: JSValue);
-    fn JS_NewBool_real(ctx: *mut JSContext, v: bool) -> JSValue;
-    fn JS_NewInt32_real(ctx: *mut JSContext, v: i32) -> JSValue;
-    fn JS_NewFloat64_real(ctx: *mut JSContext, v: f64) -> JSValue;
-}
-
-/// Increment the refcount of this value
-/// # Safety
-/// be safe
-pub unsafe fn JS_DupValue(ctx: *mut JSContext, v: JSValue) {
-    JS_DupValue_real(ctx, v);
-}
-
-/// Decrement the refcount of this value
-/// # Safety
-/// be safe
-pub unsafe fn JS_FreeValue(ctx: *mut JSContext, v: JSValue) {
-    JS_FreeValue_real(ctx, v);
-}
-
-/// create a new boolean value
-/// # Safety
-/// be safe
-pub unsafe fn JS_NewBool(ctx: *mut JSContext, v: bool) -> JSValue {
-    JS_NewBool_real(ctx, v)
-}
-
-/// create a new int32 value
-/// # Safety
-/// be safe
-pub unsafe fn JS_NewInt32(ctx: *mut JSContext, v: i32) -> JSValue {
-    JS_NewInt32_real(ctx, v)
-}
-
-/// create a new f64 value, please note that if the passed f64 fits in a i32 this will return a value with flag 0 (i32)
-/// # Safety
-/// be safe
-pub unsafe fn JS_NewFloat64(ctx: *mut JSContext, v: f64) -> JSValue {
-    JS_NewFloat64_real(ctx, v)
-}
+include!("static-functions.rs");
 
 #[cfg(test)]
 mod tests {
