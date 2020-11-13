@@ -707,7 +707,11 @@ mod tests {
             );
         })
         .unwrap();
-        assert_eq!(c.eval_as::<bool>("cb('hello', true, 100) === undefined").unwrap(), true);
+        assert_eq!(
+            c.eval_as::<bool>("cb('hello', true, 100) === undefined")
+                .unwrap(),
+            true
+        );
 
         // With return.
         c.add_callback("cb2", |args: Arguments| -> u32 {
