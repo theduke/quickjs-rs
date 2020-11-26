@@ -7,7 +7,7 @@ wrapper.
 
 
 *Version 0.7.0*
-**Embedded VERSION: 2020-09-06**
+**Embedded VERSION: 2020-11-08**
 
 ## Embedded vs system
 
