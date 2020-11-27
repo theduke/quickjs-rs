@@ -20,6 +20,8 @@ jobs:
           - macOS-latest
           - windows-latest
     runs-on: ${{ matrix.os }}
+    env:
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
 
     steps:
     - uses: actions/checkout@v1
