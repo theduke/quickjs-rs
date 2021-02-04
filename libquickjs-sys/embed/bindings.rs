@@ -3,6 +3,7 @@
 pub const _STDIO_H: u32 = 1;
 pub const _FEATURES_H: u32 = 1;
 pub const _DEFAULT_SOURCE: u32 = 1;
+pub const __GLIBC_USE_ISOC2X: u32 = 0;
 pub const __USE_ISOC11: u32 = 1;
 pub const __USE_ISOC99: u32 = 1;
 pub const __USE_ISOC95: u32 = 1;
@@ -20,93 +21,52 @@ pub const __USE_MISC: u32 = 1;
 pub const __USE_ATFILE: u32 = 1;
 pub const __USE_FORTIFY_LEVEL: u32 = 0;
 pub const __GLIBC_USE_DEPRECATED_GETS: u32 = 0;
+pub const __GLIBC_USE_DEPRECATED_SCANF: u32 = 0;
 pub const _STDC_PREDEF_H: u32 = 1;
 pub const __STDC_IEC_559__: u32 = 1;
 pub const __STDC_IEC_559_COMPLEX__: u32 = 1;
 pub const __STDC_ISO_10646__: u32 = 201706;
-pub const __STDC_NO_THREADS__: u32 = 1;
 pub const __GNU_LIBRARY__: u32 = 6;
 pub const __GLIBC__: u32 = 2;
-pub const __GLIBC_MINOR__: u32 = 26;
+pub const __GLIBC_MINOR__: u32 = 32;
 pub const _SYS_CDEFS_H: u32 = 1;
 pub const __glibc_c99_flexarr_available: u32 = 1;
 pub const __WORDSIZE: u32 = 64;
 pub const __WORDSIZE_TIME64_COMPAT32: u32 = 1;
 pub const __SYSCALL_WORDSIZE: u32 = 64;
+pub const __LDOUBLE_REDIRECTS_TO_FLOAT128_ABI: u32 = 0;
 pub const __HAVE_GENERIC_SELECTION: u32 = 1;
 pub const __GLIBC_USE_LIB_EXT2: u32 = 0;
 pub const __GLIBC_USE_IEC_60559_BFP_EXT: u32 = 0;
+pub const __GLIBC_USE_IEC_60559_BFP_EXT_C2X: u32 = 0;
 pub const __GLIBC_USE_IEC_60559_FUNCS_EXT: u32 = 0;
+pub const __GLIBC_USE_IEC_60559_FUNCS_EXT_C2X: u32 = 0;
 pub const __GLIBC_USE_IEC_60559_TYPES_EXT: u32 = 0;
+pub const __GNUC_VA_LIST: u32 = 1;
 pub const _BITS_TYPES_H: u32 = 1;
+pub const __TIMESIZE: u32 = 64;
 pub const _BITS_TYPESIZES_H: u32 = 1;
 pub const __OFF_T_MATCHES_OFF64_T: u32 = 1;
 pub const __INO_T_MATCHES_INO64_T: u32 = 1;
 pub const __RLIM_T_MATCHES_RLIM64_T: u32 = 1;
+pub const __STATFS_MATCHES_STATFS64: u32 = 1;
+pub const __KERNEL_OLD_TIMEVAL_MATCHES_TIMEVAL64: u32 = 1;
 pub const __FD_SETSIZE: u32 = 1024;
+pub const _BITS_TIME64_H: u32 = 1;
+pub const _____fpos_t_defined: u32 = 1;
+pub const ____mbstate_t_defined: u32 = 1;
+pub const _____fpos64_t_defined: u32 = 1;
 pub const ____FILE_defined: u32 = 1;
 pub const __FILE_defined: u32 = 1;
-pub const _G_config_h: u32 = 1;
-pub const ____mbstate_t_defined: u32 = 1;
-pub const _G_HAVE_MMAP: u32 = 1;
-pub const _G_HAVE_MREMAP: u32 = 1;
-pub const _G_IO_IO_FILE_VERSION: u32 = 131073;
-pub const _G_BUFSIZ: u32 = 8192;
-pub const _IO_BUFSIZ: u32 = 8192;
-pub const __GNUC_VA_LIST: u32 = 1;
-pub const _IO_UNIFIED_JUMPTABLES: u32 = 1;
-pub const EOF: i32 = -1;
-pub const _IOS_INPUT: u32 = 1;
-pub const _IOS_OUTPUT: u32 = 2;
-pub const _IOS_ATEND: u32 = 4;
-pub const _IOS_APPEND: u32 = 8;
-pub const _IOS_TRUNC: u32 = 16;
-pub const _IOS_NOCREATE: u32 = 32;
-pub const _IOS_NOREPLACE: u32 = 64;
-pub const _IOS_BIN: u32 = 128;
-pub const _IO_MAGIC: u32 = 4222418944;
-pub const _OLD_STDIO_MAGIC: u32 = 4206624768;
-pub const _IO_MAGIC_MASK: u32 = 4294901760;
-pub const _IO_USER_BUF: u32 = 1;
-pub const _IO_UNBUFFERED: u32 = 2;
-pub const _IO_NO_READS: u32 = 4;
-pub const _IO_NO_WRITES: u32 = 8;
+pub const __struct_FILE_defined: u32 = 1;
 pub const _IO_EOF_SEEN: u32 = 16;
 pub const _IO_ERR_SEEN: u32 = 32;
-pub const _IO_DELETE_DONT_CLOSE: u32 = 64;
-pub const _IO_LINKED: u32 = 128;
-pub const _IO_IN_BACKUP: u32 = 256;
-pub const _IO_LINE_BUF: u32 = 512;
-pub const _IO_TIED_PUT_GET: u32 = 1024;
-pub const _IO_CURRENTLY_PUTTING: u32 = 2048;
-pub const _IO_IS_APPENDING: u32 = 4096;
-pub const _IO_IS_FILEBUF: u32 = 8192;
-pub const _IO_BAD_SEEN: u32 = 16384;
 pub const _IO_USER_LOCK: u32 = 32768;
-pub const _IO_FLAGS2_MMAP: u32 = 1;
-pub const _IO_FLAGS2_NOTCANCEL: u32 = 2;
-pub const _IO_FLAGS2_USER_WBUF: u32 = 8;
-pub const _IO_SKIPWS: u32 = 1;
-pub const _IO_LEFT: u32 = 2;
-pub const _IO_RIGHT: u32 = 4;
-pub const _IO_INTERNAL: u32 = 8;
-pub const _IO_DEC: u32 = 16;
-pub const _IO_OCT: u32 = 32;
-pub const _IO_HEX: u32 = 64;
-pub const _IO_SHOWBASE: u32 = 128;
-pub const _IO_SHOWPOINT: u32 = 256;
-pub const _IO_UPPERCASE: u32 = 512;
-pub const _IO_SHOWPOS: u32 = 1024;
-pub const _IO_SCIENTIFIC: u32 = 2048;
-pub const _IO_FIXED: u32 = 4096;
-pub const _IO_UNITBUF: u32 = 8192;
-pub const _IO_STDIO: u32 = 16384;
-pub const _IO_DONT_CLOSE: u32 = 32768;
-pub const _IO_BOOLALPHA: u32 = 65536;
 pub const _IOFBF: u32 = 0;
 pub const _IOLBF: u32 = 1;
 pub const _IONBF: u32 = 2;
 pub const BUFSIZ: u32 = 8192;
+pub const EOF: i32 = -1;
 pub const SEEK_SET: u32 = 0;
 pub const SEEK_CUR: u32 = 1;
 pub const SEEK_END: u32 = 2;
@@ -117,6 +77,22 @@ pub const TMP_MAX: u32 = 238328;
 pub const FILENAME_MAX: u32 = 4096;
 pub const L_ctermid: u32 = 9;
 pub const FOPEN_MAX: u32 = 16;
+pub const __HAVE_FLOAT128: u32 = 0;
+pub const __HAVE_DISTINCT_FLOAT128: u32 = 0;
+pub const __HAVE_FLOAT64X: u32 = 1;
+pub const __HAVE_FLOAT64X_LONG_DOUBLE: u32 = 1;
+pub const __HAVE_FLOAT16: u32 = 0;
+pub const __HAVE_FLOAT32: u32 = 1;
+pub const __HAVE_FLOAT64: u32 = 1;
+pub const __HAVE_FLOAT32X: u32 = 1;
+pub const __HAVE_FLOAT128X: u32 = 0;
+pub const __HAVE_DISTINCT_FLOAT16: u32 = 0;
+pub const __HAVE_DISTINCT_FLOAT32: u32 = 0;
+pub const __HAVE_DISTINCT_FLOAT64: u32 = 0;
+pub const __HAVE_DISTINCT_FLOAT32X: u32 = 0;
+pub const __HAVE_DISTINCT_FLOAT64X: u32 = 0;
+pub const __HAVE_DISTINCT_FLOAT128X: u32 = 0;
+pub const __HAVE_FLOATN_NOT_TYPEDEF: u32 = 0;
 pub const _STDINT_H: u32 = 1;
 pub const _BITS_WCHAR_H: u32 = 1;
 pub const _BITS_STDINT_INTN_H: u32 = 1;
@@ -216,6 +192,8 @@ pub const JS_DEF_PROP_UNDEFINED: u32 = 7;
 pub const JS_DEF_OBJECT: u32 = 8;
 pub const JS_DEF_ALIAS: u32 = 9;
 pub type size_t = ::std::os::raw::c_ulong;
+pub type va_list = __builtin_va_list;
+pub type __gnuc_va_list = __builtin_va_list;
 pub type __u_char = ::std::os::raw::c_uchar;
 pub type __u_short = ::std::os::raw::c_ushort;
 pub type __u_int = ::std::os::raw::c_uint;
@@ -228,6 +206,14 @@ pub type __int32_t = ::std::os::raw::c_int;
 pub type __uint32_t = ::std::os::raw::c_uint;
 pub type __int64_t = ::std::os::raw::c_long;
 pub type __uint64_t = ::std::os::raw::c_ulong;
+pub type __int_least8_t = __int8_t;
+pub type __uint_least8_t = __uint8_t;
+pub type __int_least16_t = __int16_t;
+pub type __uint_least16_t = __uint16_t;
+pub type __int_least32_t = __int32_t;
+pub type __uint_least32_t = __uint32_t;
+pub type __int_least64_t = __int64_t;
+pub type __uint_least64_t = __uint64_t;
 pub type __quad_t = ::std::os::raw::c_long;
 pub type __u_quad_t = ::std::os::raw::c_ulong;
 pub type __intmax_t = ::std::os::raw::c_long;
@@ -277,6 +263,7 @@ pub type __id_t = ::std::os::raw::c_uint;
 pub type __time_t = ::std::os::raw::c_long;
 pub type __useconds_t = ::std::os::raw::c_uint;
 pub type __suseconds_t = ::std::os::raw::c_long;
+pub type __suseconds64_t = ::std::os::raw::c_long;
 pub type __daddr_t = ::std::os::raw::c_int;
 pub type __key_t = ::std::os::raw::c_int;
 pub type __clockid_t = ::std::os::raw::c_int;
@@ -293,13 +280,10 @@ pub type __ssize_t = ::std::os::raw::c_long;
 pub type __syscall_slong_t = ::std::os::raw::c_long;
 pub type __syscall_ulong_t = ::std::os::raw::c_ulong;
 pub type __loff_t = __off64_t;
-pub type __qaddr_t = *mut __quad_t;
 pub type __caddr_t = *mut ::std::os::raw::c_char;
 pub type __intptr_t = ::std::os::raw::c_long;
 pub type __socklen_t = ::std::os::raw::c_uint;
 pub type __sig_atomic_t = ::std::os::raw::c_int;
-pub type __FILE = _IO_FILE;
-pub type FILE = _IO_FILE;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct __mbstate_t {
@@ -420,6 +404,7 @@ fn bindgen_test_layout__G_fpos_t() {
         )
     );
 }
+pub type __fpos_t = _G_fpos_t;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct _G_fpos64_t {
@@ -459,69 +444,25 @@ fn bindgen_test_layout__G_fpos64_t() {
         )
     );
 }
-pub type va_list = __builtin_va_list;
-pub type __gnuc_va_list = __builtin_va_list;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct _IO_jump_t {
-    _unused: [u8; 0],
-}
-pub type _IO_lock_t = ::std::os::raw::c_void;
+pub type __fpos64_t = _G_fpos64_t;
+pub type __FILE = _IO_FILE;
+pub type FILE = _IO_FILE;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct _IO_marker {
-    pub _next: *mut _IO_marker,
-    pub _sbuf: *mut _IO_FILE,
-    pub _pos: ::std::os::raw::c_int,
+    _unused: [u8; 0],
 }
-#[test]
-fn bindgen_test_layout__IO_marker() {
-    assert_eq!(
-        ::std::mem::size_of::<_IO_marker>(),
-        24usize,
-        concat!("Size of: ", stringify!(_IO_marker))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<_IO_marker>(),
-        8usize,
-        concat!("Alignment of ", stringify!(_IO_marker))
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_IO_marker>()))._next as *const _ as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_IO_marker),
-            "::",
-            stringify!(_next)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_IO_marker>()))._sbuf as *const _ as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_IO_marker),
-            "::",
-            stringify!(_sbuf)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_IO_marker>()))._pos as *const _ as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_IO_marker),
-            "::",
-            stringify!(_pos)
-        )
-    );
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct _IO_codecvt {
+    _unused: [u8; 0],
 }
-pub const __codecvt_result___codecvt_ok: __codecvt_result = 0;
-pub const __codecvt_result___codecvt_partial: __codecvt_result = 1;
-pub const __codecvt_result___codecvt_error: __codecvt_result = 2;
-pub const __codecvt_result___codecvt_noconv: __codecvt_result = 3;
-pub type __codecvt_result = ::std::os::raw::c_uint;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct _IO_wide_data {
+    _unused: [u8; 0],
+}
+pub type _IO_lock_t = ::std::os::raw::c_void;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct _IO_FILE {
@@ -547,10 +488,10 @@ pub struct _IO_FILE {
     pub _shortbuf: [::std::os::raw::c_char; 1usize],
     pub _lock: *mut _IO_lock_t,
     pub _offset: __off64_t,
-    pub __pad1: *mut ::std::os::raw::c_void,
-    pub __pad2: *mut ::std::os::raw::c_void,
-    pub __pad3: *mut ::std::os::raw::c_void,
-    pub __pad4: *mut ::std::os::raw::c_void,
+    pub _codecvt: *mut _IO_codecvt,
+    pub _wide_data: *mut _IO_wide_data,
+    pub _freeres_list: *mut _IO_FILE,
+    pub _freeres_buf: *mut ::std::os::raw::c_void,
     pub __pad5: size_t,
     pub _mode: ::std::os::raw::c_int,
     pub _unused2: [::std::os::raw::c_char; 20usize],
@@ -788,43 +729,43 @@ fn bindgen_test_layout__IO_FILE() {
         )
     );
     assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_IO_FILE>())).__pad1 as *const _ as usize },
+        unsafe { &(*(::std::ptr::null::<_IO_FILE>()))._codecvt as *const _ as usize },
         152usize,
         concat!(
             "Offset of field: ",
             stringify!(_IO_FILE),
             "::",
-            stringify!(__pad1)
+            stringify!(_codecvt)
         )
     );
     assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_IO_FILE>())).__pad2 as *const _ as usize },
+        unsafe { &(*(::std::ptr::null::<_IO_FILE>()))._wide_data as *const _ as usize },
         160usize,
         concat!(
             "Offset of field: ",
             stringify!(_IO_FILE),
             "::",
-            stringify!(__pad2)
+            stringify!(_wide_data)
         )
     );
     assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_IO_FILE>())).__pad3 as *const _ as usize },
+        unsafe { &(*(::std::ptr::null::<_IO_FILE>()))._freeres_list as *const _ as usize },
         168usize,
         concat!(
             "Offset of field: ",
             stringify!(_IO_FILE),
             "::",
-            stringify!(__pad3)
+            stringify!(_freeres_list)
         )
     );
     assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_IO_FILE>())).__pad4 as *const _ as usize },
+        unsafe { &(*(::std::ptr::null::<_IO_FILE>()))._freeres_buf as *const _ as usize },
         176usize,
         concat!(
             "Offset of field: ",
             stringify!(_IO_FILE),
             "::",
-            stringify!(__pad4)
+            stringify!(_freeres_buf)
         )
     );
     assert_eq!(
@@ -858,132 +799,17 @@ fn bindgen_test_layout__IO_FILE() {
         )
     );
 }
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct _IO_FILE_plus {
-    _unused: [u8; 0],
-}
-extern "C" {
-    pub static mut _IO_2_1_stdin_: _IO_FILE_plus;
-}
-extern "C" {
-    pub static mut _IO_2_1_stdout_: _IO_FILE_plus;
-}
-extern "C" {
-    pub static mut _IO_2_1_stderr_: _IO_FILE_plus;
-}
-pub type __io_read_fn = ::std::option::Option<
-    unsafe extern "C" fn(
-        __cookie: *mut ::std::os::raw::c_void,
-        __buf: *mut ::std::os::raw::c_char,
-        __nbytes: size_t,
-    ) -> __ssize_t,
->;
-pub type __io_write_fn = ::std::option::Option<
-    unsafe extern "C" fn(
-        __cookie: *mut ::std::os::raw::c_void,
-        __buf: *const ::std::os::raw::c_char,
-        __n: size_t,
-    ) -> __ssize_t,
->;
-pub type __io_seek_fn = ::std::option::Option<
-    unsafe extern "C" fn(
-        __cookie: *mut ::std::os::raw::c_void,
-        __pos: *mut __off64_t,
-        __w: ::std::os::raw::c_int,
-    ) -> ::std::os::raw::c_int,
->;
-pub type __io_close_fn = ::std::option::Option<
-    unsafe extern "C" fn(__cookie: *mut ::std::os::raw::c_void) -> ::std::os::raw::c_int,
->;
-extern "C" {
-    pub fn __underflow(arg1: *mut _IO_FILE) -> ::std::os::raw::c_int;
-}
-extern "C" {
-    pub fn __uflow(arg1: *mut _IO_FILE) -> ::std::os::raw::c_int;
-}
-extern "C" {
-    pub fn __overflow(arg1: *mut _IO_FILE, arg2: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
-}
-extern "C" {
-    pub fn _IO_getc(__fp: *mut _IO_FILE) -> ::std::os::raw::c_int;
-}
-extern "C" {
-    pub fn _IO_putc(__c: ::std::os::raw::c_int, __fp: *mut _IO_FILE) -> ::std::os::raw::c_int;
-}
-extern "C" {
-    pub fn _IO_feof(__fp: *mut _IO_FILE) -> ::std::os::raw::c_int;
-}
-extern "C" {
-    pub fn _IO_ferror(__fp: *mut _IO_FILE) -> ::std::os::raw::c_int;
-}
-extern "C" {
-    pub fn _IO_peekc_locked(__fp: *mut _IO_FILE) -> ::std::os::raw::c_int;
-}
-extern "C" {
-    pub fn _IO_flockfile(arg1: *mut _IO_FILE);
-}
-extern "C" {
-    pub fn _IO_funlockfile(arg1: *mut _IO_FILE);
-}
-extern "C" {
-    pub fn _IO_ftrylockfile(arg1: *mut _IO_FILE) -> ::std::os::raw::c_int;
-}
-extern "C" {
-    pub fn _IO_vfscanf(
-        arg1: *mut _IO_FILE,
-        arg2: *const ::std::os::raw::c_char,
-        arg3: *mut __va_list_tag,
-        arg4: *mut ::std::os::raw::c_int,
-    ) -> ::std::os::raw::c_int;
-}
-extern "C" {
-    pub fn _IO_vfprintf(
-        arg1: *mut _IO_FILE,
-        arg2: *const ::std::os::raw::c_char,
-        arg3: *mut __va_list_tag,
-    ) -> ::std::os::raw::c_int;
-}
-extern "C" {
-    pub fn _IO_padn(arg1: *mut _IO_FILE, arg2: ::std::os::raw::c_int, arg3: __ssize_t)
-        -> __ssize_t;
-}
-extern "C" {
-    pub fn _IO_sgetn(
-        arg1: *mut _IO_FILE,
-        arg2: *mut ::std::os::raw::c_void,
-        arg3: size_t,
-    ) -> size_t;
-}
-extern "C" {
-    pub fn _IO_seekoff(
-        arg1: *mut _IO_FILE,
-        arg2: __off64_t,
-        arg3: ::std::os::raw::c_int,
-        arg4: ::std::os::raw::c_int,
-    ) -> __off64_t;
-}
-extern "C" {
-    pub fn _IO_seekpos(
-        arg1: *mut _IO_FILE,
-        arg2: __off64_t,
-        arg3: ::std::os::raw::c_int,
-    ) -> __off64_t;
-}
-extern "C" {
-    pub fn _IO_free_backup_area(arg1: *mut _IO_FILE);
-}
 pub type off_t = __off_t;
 pub type ssize_t = __ssize_t;
-pub type fpos_t = _G_fpos_t;
+pub type fpos_t = __fpos_t;
 extern "C" {
-    pub static mut stdin: *mut _IO_FILE;
+    pub static mut stdin: *mut FILE;
 }
 extern "C" {
-    pub static mut stdout: *mut _IO_FILE;
+    pub static mut stdout: *mut FILE;
 }
 extern "C" {
-    pub static mut stderr: *mut _IO_FILE;
+    pub static mut stderr: *mut FILE;
 }
 extern "C" {
     pub fn remove(__filename: *const ::std::os::raw::c_char) -> ::std::os::raw::c_int;
@@ -1157,6 +983,10 @@ extern "C" {
         ...
     ) -> ::std::os::raw::c_int;
 }
+pub type _Float32 = f32;
+pub type _Float64 = f64;
+pub type _Float32x = f64;
+pub type _Float64x = u128;
 extern "C" {
     #[link_name = "\u{1}__isoc99_fscanf"]
     pub fn fscanf1(
@@ -1385,12 +1215,6 @@ extern "C" {
     pub fn perror(__s: *const ::std::os::raw::c_char);
 }
 extern "C" {
-    pub static mut sys_nerr: ::std::os::raw::c_int;
-}
-extern "C" {
-    pub static mut sys_errlist: [*const ::std::os::raw::c_char; 0usize];
-}
-extern "C" {
     pub fn fileno(__stream: *mut FILE) -> ::std::os::raw::c_int;
 }
 extern "C" {
@@ -1417,14 +1241,20 @@ extern "C" {
 extern "C" {
     pub fn funlockfile(__stream: *mut FILE);
 }
-pub type int_least8_t = ::std::os::raw::c_schar;
-pub type int_least16_t = ::std::os::raw::c_short;
-pub type int_least32_t = ::std::os::raw::c_int;
-pub type int_least64_t = ::std::os::raw::c_long;
-pub type uint_least8_t = ::std::os::raw::c_uchar;
-pub type uint_least16_t = ::std::os::raw::c_ushort;
-pub type uint_least32_t = ::std::os::raw::c_uint;
-pub type uint_least64_t = ::std::os::raw::c_ulong;
+extern "C" {
+    pub fn __uflow(arg1: *mut FILE) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn __overflow(arg1: *mut FILE, arg2: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
+}
+pub type int_least8_t = __int_least8_t;
+pub type int_least16_t = __int_least16_t;
+pub type int_least32_t = __int_least32_t;
+pub type int_least64_t = __int_least64_t;
+pub type uint_least8_t = __uint_least8_t;
+pub type uint_least16_t = __uint_least16_t;
+pub type uint_least32_t = __uint_least32_t;
+pub type uint_least64_t = __uint_least64_t;
 pub type int_fast8_t = ::std::os::raw::c_schar;
 pub type int_fast16_t = ::std::os::raw::c_long;
 pub type int_fast32_t = ::std::os::raw::c_long;
