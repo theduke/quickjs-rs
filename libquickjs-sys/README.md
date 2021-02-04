@@ -31,4 +31,4 @@ To updat the bindings, follow these steps:
 
 * (Install [just](https://github.com/casey/just))
 * Update the download URL in ./justfile
-* run `just quickjs-update`
+* run `just update-quickjs`
