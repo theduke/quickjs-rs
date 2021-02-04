@@ -24,11 +24,6 @@ fn main() {
     #[cfg(feature = "patched")]
     panic!("Invalid configuration for libquickjs-sys: the patched feature is incompatible with the system feature");
 
-    // compile statics
-    cc::Build::new()
-        .file("static-functions.c")
-        .compile("libquickjs-static-functions.a");
-
     let lib: std::borrow::Cow<str> = if let Ok(lib) = env::var("QUICKJS_LIBRARY_PATH") {
         lib.into()
     } else if cfg!(unix) {
@@ -43,18 +38,6 @@ fn main() {
         panic!("quickjs error: Windows is not supported yet");
     };
 
-    // Generate bindings.
-    let bindings = bindgen::Builder::default()
-        .header("wrapper.h")
-        .generate()
-        .expect("Unable to generate bindings");
-
-    // Write the bindings to the $OUT_DIR/bindings.rs file.
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-    bindings
-        .write_to_file(out_path.join("bindings.rs"))
-        .expect("Couldn't write bindings!");
-
     // Instruct cargo to statically link quickjs.
     println!("cargo:rustc-link-search=native={}", lib);
     println!("cargo:rustc-link-lib=static={}", LIB_NAME);
@@ -62,11 +45,6 @@ fn main() {
 
 #[cfg(feature = "bundled")]
 fn main() {
-    // compile statics
-    cc::Build::new()
-        .file("static-functions.c")
-        .compile("libquickjs-static-functions.a");
-
     let embed_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("embed");
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
@@ -80,6 +58,12 @@ fn main() {
     #[cfg(feature = "patched")]
     apply_patches(&code_dir);
 
+    std::fs::copy(
+        embed_path.join("static-functions.c"),
+        code_dir.join("static-functions.c"),
+    )
+    .expect("Could not copy static-functions.c");
+
     eprintln!("Compiling quickjs...");
     let quickjs_version =
         std::fs::read_to_string(code_dir.join("VERSION")).expect("failed to read quickjs version");
@@ -91,6 +75,8 @@ fn main() {
                 "libregexp.c",
                 "libunicode.c",
                 "quickjs.c",
+                // Custom wrappers.
+                "static-functions.c",
             ]
             .iter()
             .map(|f| code_dir.join(f)),

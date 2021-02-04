@@ -1,7 +1,9 @@
-#include "embed/quickjs/quickjs.h"
+#include "quickjs.h"
 
-// these are static inline functions in quickjs.h so bindgen does not pick them up
-// we impl them here as real functions so they can be added to lib.rs
+// These are static inline functions in quickjs.h so bindgen does not pick 
+// them up.
+// We use define simple wrapper functions to make them available to bindgen,
+// and therefore make them usable from Rust.
 
 void JS_FreeValue_real(JSContext *ctx, JSValue v) {
     JS_FreeValue(ctx, v);
