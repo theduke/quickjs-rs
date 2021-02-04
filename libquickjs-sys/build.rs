@@ -128,7 +128,7 @@ fn apply_patches(code_dir: &PathBuf) {
         let status = std::process::Command::new("patch")
             .current_dir(&code_dir)
             .arg("-i")
-            .arg(fs::canonicalize(patch.path()).expect("Cannot canonicalize patch path"))
+            .arg(patch.path())
             .spawn()
             .expect("Could not apply patches")
             .wait()
