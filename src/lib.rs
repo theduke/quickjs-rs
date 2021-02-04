@@ -280,6 +280,28 @@ impl Context {
         Ok(ret)
     }
 
+    /// Set a global variable.
+    ///
+    /// ```rust
+    /// use quick_js::{Context, JsValue};
+    /// let context = Context::new().unwrap();
+    ///
+    /// context.set_global("someGlobalVariable", 42).unwrap();
+    /// let value = context.eval_as::<i32>("someGlobalVariable").unwrap();
+    /// assert_eq!(
+    ///     value,
+    ///     42,
+    /// );
+    /// ```
+    pub fn set_global<V>(&self, name: &str, value: V) -> Result<(), ExecutionError>
+    where
+        V: Into<JsValue>,
+    {
+        let global = self.wrapper.global()?;
+        global.set_property(name, value.into())?;
+        Ok(())
+    }
+
     /// Call a global function in the Javascript namespace.
     ///
     /// **Promises**:

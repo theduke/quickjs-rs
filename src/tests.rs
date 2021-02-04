@@ -160,6 +160,14 @@ fn eval_async() {
 }
 
 #[test]
+fn test_set_global() {
+    let context = Context::new().unwrap();
+    context.set_global("someGlobalVariable", 42).unwrap();
+    let value = context.eval_as::<i32>("someGlobalVariable").unwrap();
+    assert_eq!(value, 42,);
+}
+
+#[test]
 fn test_call() {
     let c = Context::new().unwrap();
 
