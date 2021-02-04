@@ -763,10 +763,10 @@ impl<'a> OwnedObjectRef<'a> {
         }
     }
 
-    // pub fn set_property(&self, name: &str, value: JsValue) -> Result<(), ExecutionError> {
-    //     let qval = self.value.context.serialize_value(value)?;
-    //     unsafe { self.set_property_raw(name, qval.value) }
-    // }
+    pub fn set_property(&self, name: &str, value: JsValue) -> Result<(), ExecutionError> {
+        let qval = self.value.context.serialize_value(value)?;
+        unsafe { self.set_property_raw(name, qval.value) }
+    }
 }
 
 /*
