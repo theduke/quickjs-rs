@@ -141,7 +141,7 @@ impl ContextBuilder {
     /// Set a console handler that will proxy `console.{log,trace,debug,...}`
     /// calls.
     ///
-    /// The given argument must implement the [ConsoleBackend] trait.
+    /// The given argument must implement the [console::ConsoleBackend] trait.
     ///
     /// A very simple logger could look like this:
     pub fn console<B>(mut self, backend: B) -> Self

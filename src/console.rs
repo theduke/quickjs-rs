@@ -5,7 +5,7 @@ use super::JsValue;
 
 /// Log level of a log message sent via the console.
 /// These levels represent the different functions defined in the spec:
-/// https://s3.amazonaws.com/temp.michaelfbryan.com/callbacks/index.html
+/// <https://s3.amazonaws.com/temp.michaelfbryan.com/callbacks/index.html>
 #[allow(missing_docs)]
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Level {
