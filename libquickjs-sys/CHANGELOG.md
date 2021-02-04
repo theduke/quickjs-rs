@@ -1,5 +1,10 @@
 # libquickjs_sys - Changelog
 
+## v0.9.0 - 2021-02-04
+
+* Upgraded to quickjs version `2020-11-08`
+* Added wrappers to expose various QuickJS functions that are `inline static`
+* Always compile with -fPIC
 
 ## v0.8.0 - 2020-09-29
 

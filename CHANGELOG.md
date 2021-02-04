@@ -2,6 +2,12 @@
 
 ## Master branch
 
+## v0.4.0 - 2021-02-05
+
+* Bumped quickjs to `2020-11-08`
+* Added `Context::set_global`
+* Added `JsValue::Undefined` (breaking change)
+
 ## v0.3.4 - 2020-07-09
 
 * Bump quickjs to 2020-07-05

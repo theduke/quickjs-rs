@@ -6,7 +6,7 @@ See the [quick](https://crates.io/crates/quickjs) crate for a high-level
 wrapper.
 
 
-*Version 0.7.0*
+*Version 0.9.0*
 **Embedded VERSION: 2020-11-08**
 
 ## Embedded vs system
