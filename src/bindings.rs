@@ -467,19 +467,24 @@ fn deserialize_value(
 
                         let timestamp_raw =
                             unsafe { q::JS_Call(context, getter, *r, 0, std::ptr::null_mut()) };
+
                         unsafe {
                             free_value(context, getter);
                             free_value(context, date_constructor);
                         };
 
-                        let res = if timestamp_raw.tag != TAG_FLOAT64 {
-                            Err(ValueError::Internal(
-                                "Could not convert 'Date' instance to timestamp".into(),
-                            ))
-                        } else {
+                        let res = if timestamp_raw.tag == TAG_FLOAT64 {
                             let f = unsafe { timestamp_raw.u.float64 } as i64;
                             let datetime = chrono::Utc.timestamp_millis(f);
                             Ok(JsValue::Date(datetime))
+                        } else if timestamp_raw.tag == TAG_INT {
+                            let f = unsafe { timestamp_raw.u.int32 } as i64;
+                            let datetime = chrono::Utc.timestamp_millis(f);
+                            Ok(JsValue::Date(datetime))
+                        } else {
+                            Err(ValueError::Internal(
+                                "Could not convert 'Date' instance to timestamp".into(),
+                            ))
                         };
                         return res;
                     } else {
