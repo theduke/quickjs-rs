@@ -288,6 +288,10 @@ fn test_callback() {
     c.add_callback("add2", |a: i32, b: i32| -> i32 { a + b })
         .unwrap();
     assert_eq!(c.eval("add2(5, 11)").unwrap(), JsValue::Int(16),);
+
+    c.add_callback("sum", |items: Vec<i32>| -> i32 { items.iter().sum() })
+        .unwrap();
+    assert_eq!(c.eval("sum([1, 2, 3, 4, 5, 6])").unwrap(), JsValue::Int(21),);
 }
 
 #[test]

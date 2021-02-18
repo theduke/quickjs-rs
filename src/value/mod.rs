@@ -190,6 +190,23 @@ where
     }
 }
 
+impl<T> TryFrom<JsValue> for Vec<T>
+where
+    T: TryFrom<JsValue>,
+{
+    type Error = ValueError;
+
+    fn try_from(value: JsValue) -> Result<Self, Self::Error> {
+        match value {
+            JsValue::Array(items) => items
+                .into_iter()
+                .map(|item| item.try_into().map_err(|_| ValueError::UnexpectedType))
+                .collect(),
+            _ => Err(ValueError::UnexpectedType),
+        }
+    }
+}
+
 impl<'a> From<&'a str> for JsValue {
     fn from(val: &'a str) -> Self {
         JsValue::String(val.into())
