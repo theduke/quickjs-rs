@@ -15,12 +15,14 @@ use crate::{
     droppable_value::DroppableValue,
     ContextError, ExecutionError, JsValue, ValueError,
 };
+use libquickjs_sys::JS_DupValue;
 
 // JS_TAG_* constants from quickjs.
 // For some reason bindgen does not pick them up.
 #[cfg(feature = "bigint")]
 const TAG_BIG_INT: i64 = -10;
 const TAG_STRING: i64 = -7;
+const TAG_FUNCTION_BYTECODE: i64 = -2;
 const TAG_OBJECT: i64 = -1;
 const TAG_INT: i64 = 0;
 const TAG_BOOL: i64 = 1;
@@ -28,23 +30,6 @@ const TAG_NULL: i64 = 2;
 const TAG_UNDEFINED: i64 = 3;
 const TAG_EXCEPTION: i64 = 6;
 const TAG_FLOAT64: i64 = 7;
-
-/// Free a JSValue.
-/// This function is the equivalent of JS_FreeValue from quickjs, which can not
-/// be used due to being `static inline`.
-unsafe fn free_value(context: *mut q::JSContext, value: q::JSValue) {
-    // All tags < 0 are garbage collected and need to be freed.
-    if value.tag < 0 {
-        // This transmute is OK since if tag < 0, the union will be a refcount
-        // pointer.
-        let ptr = value.u.ptr as *mut q::JSRefCountHeader;
-        let pref: &mut q::JSRefCountHeader = &mut *ptr;
-        pref.ref_count -= 1;
-        if pref.ref_count <= 0 {
-            q::__JS_FreeValue(context, value);
-        }
-    }
-}
 
 #[cfg(feature = "chrono")]
 fn js_date_constructor(context: *mut q::JSContext) -> q::JSValue {
@@ -61,7 +46,7 @@ fn js_date_constructor(context: *mut q::JSContext) -> q::JSValue {
         )
     };
     assert_eq!(date_constructor.tag, TAG_OBJECT);
-    unsafe { free_value(context, global) };
+    unsafe { q::JS_FreeValue(context, global) };
     date_constructor
 }
 
@@ -80,7 +65,7 @@ fn js_create_bigint_function(context: *mut q::JSContext) -> q::JSValue {
         )
     };
     assert_eq!(bigint_function.tag, TAG_OBJECT);
-    unsafe { free_value(context, global) };
+    unsafe { q::JS_FreeValue(context, global) };
     bigint_function
 }
 
@@ -137,9 +122,11 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                     Err(e) => {
                         // Make sure to free the array if a individual element
                         // fails.
+
                         unsafe {
-                            free_value(context, arr);
+                            q::JS_FreeValue(context, arr);
                         }
+
                         return Err(e);
                     }
                 };
@@ -157,7 +144,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                     // Make sure to free the array if a individual
                     // element fails.
                     unsafe {
-                        free_value(context, arr);
+                        q::JS_FreeValue(context, arr);
                     }
                     return Err(ValueError::Internal(
                         "Could not append element to array".into(),
@@ -178,7 +165,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                 let qvalue = serialize_value(context, value).map_err(|e| {
                     // Free the object if a property failed.
                     unsafe {
-                        free_value(context, obj);
+                        q::JS_FreeValue(context, obj);
                     }
                     e
                 })?;
@@ -195,7 +182,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                 if ret < 0 {
                     // Free the object if a property failed.
                     unsafe {
-                        free_value(context, obj);
+                        q::JS_FreeValue(context, obj);
                     }
                     return Err(ValueError::Internal(
                         "Could not add add property to object".into(),
@@ -227,7 +214,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                 )
             };
             unsafe {
-                free_value(context, date_constructor);
+                q::JS_FreeValue(context, date_constructor);
             }
 
             if value.tag != TAG_OBJECT {
@@ -250,7 +237,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                     )
                 };
                 let s = DroppableValue::new(s, |&mut s| unsafe {
-                    free_value(context, s);
+                    q::JS_FreeValue(context, s);
                 });
                 if (*s).tag != TAG_STRING {
                     return Err(ValueError::Internal(
@@ -263,7 +250,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                 let bigint_function = js_create_bigint_function(context);
                 let bigint_function =
                     DroppableValue::new(bigint_function, |&mut bigint_function| unsafe {
-                        free_value(context, bigint_function);
+                        q::JS_FreeValue(context, bigint_function);
                     });
                 let js_bigint = unsafe {
                     q::JS_Call(
@@ -300,7 +287,7 @@ fn deserialize_array(
     let len_raw = unsafe { q::JS_GetPropertyStr(context, *raw_value, length_name.as_ptr()) };
 
     let len_res = deserialize_value(context, &len_raw);
-    unsafe { free_value(context, len_raw) };
+    unsafe { q::JS_FreeValue(context, len_raw) };
     let len = match len_res? {
         JsValue::Int(x) => x,
         _ => {
@@ -317,7 +304,7 @@ fn deserialize_array(
             return Err(ValueError::Internal("Could not build array".into()));
         }
         let value_res = deserialize_value(context, &value_raw);
-        unsafe { free_value(context, value_raw) };
+        unsafe { q::JS_FreeValue(context, value_raw) };
 
         let value = value_res?;
         values.push(value);
@@ -364,7 +351,7 @@ fn deserialize_object(context: *mut q::JSContext, obj: &q::JSValue) -> Result<Js
 
         let value_res = deserialize_value(context, &raw_value);
         unsafe {
-            free_value(context, raw_value);
+            q::JS_FreeValue(context, raw_value);
         }
         let value = value_res?;
 
@@ -377,7 +364,7 @@ fn deserialize_object(context: *mut q::JSContext, obj: &q::JSValue) -> Result<Js
 
         let key_res = deserialize_value(context, &key_value);
         unsafe {
-            free_value(context, key_value);
+            q::JS_FreeValue(context, key_value);
         }
         let key = match key_res? {
             JsValue::String(s) => s,
@@ -469,8 +456,8 @@ fn deserialize_value(
                             unsafe { q::JS_Call(context, getter, *r, 0, std::ptr::null_mut()) };
 
                         unsafe {
-                            free_value(context, getter);
-                            free_value(context, date_constructor);
+                            q::JS_FreeValue(context, getter);
+                            q::JS_FreeValue(context, date_constructor);
                         };
 
                         let res = if timestamp_raw.tag == TAG_FLOAT64 {
@@ -488,7 +475,7 @@ fn deserialize_value(
                         };
                         return res;
                     } else {
-                        unsafe { free_value(context, date_constructor) };
+                        unsafe { q::JS_FreeValue(context, date_constructor) };
                     }
                 }
 
@@ -597,8 +584,14 @@ pub struct OwnedValueRef<'a> {
 impl<'a> Drop for OwnedValueRef<'a> {
     fn drop(&mut self) {
         unsafe {
-            free_value(self.context.context, self.value);
+            q::JS_FreeValue(self.context.context, self.value);
         }
+    }
+}
+
+impl<'a> Clone for OwnedValueRef<'a> {
+    fn clone(&self) -> Self {
+        Self::new_dup(self.context, self.value)
     }
 }
 
@@ -613,6 +606,7 @@ impl<'a> std::fmt::Debug for OwnedValueRef<'a> {
             TAG_FLOAT64 => write!(f, "Float(?)"),
             TAG_STRING => write!(f, "String(?)"),
             TAG_OBJECT => write!(f, "Object(?)"),
+            TAG_FUNCTION_BYTECODE => write!(f, "Bytecode(?)"),
             _ => write!(f, "?"),
         }
     }
@@ -622,6 +616,11 @@ impl<'a> OwnedValueRef<'a> {
     pub fn new(context: &'a ContextWrapper, value: q::JSValue) -> Self {
         Self { context, value }
     }
+    pub fn new_dup(context: &'a ContextWrapper, value: q::JSValue) -> Self {
+        let ret = Self::new(context, value);
+        unsafe { JS_DupValue(ret.context.context, ret.value) };
+        ret
+    }
 
     /// Get the inner JSValue without freeing in drop.
     ///
@@ -630,6 +629,18 @@ impl<'a> OwnedValueRef<'a> {
         let v = self.value;
         std::mem::forget(self);
         v
+    }
+
+    /// Get the inner JSValue without increasing ref count
+    pub(crate) fn as_inner(&self) -> &q::JSValue {
+        &self.value
+    }
+
+    /// Get the inner JSValue while increasing ref count, this is handy when you pass a JSValue to a new owner like e.g. setProperty
+    #[allow(dead_code)]
+    pub(crate) fn as_inner_dup(&self) -> &q::JSValue {
+        unsafe { q::JS_DupValue(self.context.context, self.value) };
+        &self.value
     }
 
     pub fn is_null(&self) -> bool {
@@ -650,6 +661,10 @@ impl<'a> OwnedValueRef<'a> {
 
     pub fn is_string(&self) -> bool {
         self.value.tag == TAG_STRING
+    }
+
+    pub fn is_compiled_function(&self) -> bool {
+        self.value.tag == TAG_FUNCTION_BYTECODE
     }
 
     pub fn to_string(&self) -> Result<String, ExecutionError> {
@@ -678,6 +693,19 @@ impl<'a> OwnedValueRef<'a> {
         match self.to_value()? {
             JsValue::Bool(b) => Ok(b),
             _ => Err(ValueError::UnexpectedType),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn get_ref_count(&self) -> i32 {
+        if self.value.tag < 0 {
+            // This transmute is OK since if tag < 0, the union will be a refcount
+            // pointer.
+            let ptr = unsafe { self.value.u.ptr as *mut q::JSRefCountHeader };
+            let pref: &mut q::JSRefCountHeader = &mut unsafe { *ptr };
+            pref.ref_count
+        } else {
+            -1
         }
     }
 }
@@ -709,7 +737,7 @@ impl<'a> OwnedObjectRef<'a> {
         };
         let t = raw.tag;
         unsafe {
-            free_value(self.value.context.context, raw);
+            q::JS_FreeValue(self.value.context.context, raw);
         }
         Ok(t)
     }
@@ -797,7 +825,7 @@ unsafe extern "C" fn native_module_init(
 /// Cleanup of the context happens in drop.
 pub struct ContextWrapper {
     runtime: *mut q::JSRuntime,
-    context: *mut q::JSContext,
+    pub(crate) context: *mut q::JSContext,
     /// Stores callback closures and quickjs data pointers.
     /// This array is write-only and only exists to ensure the lifetime of
     /// the closure.
@@ -937,7 +965,7 @@ impl ContextWrapper {
     }
 
     /// Get the last exception from the runtime, and if present, convert it to a ExceptionError.
-    fn get_exception(&self) -> Option<ExecutionError> {
+    pub(crate) fn get_exception(&self) -> Option<ExecutionError> {
         let raw = unsafe { q::JS_GetException(self.context) };
         let value = OwnedValueRef::new(self, raw);
 
