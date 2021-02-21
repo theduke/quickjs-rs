@@ -21,6 +21,7 @@ use crate::{
 #[cfg(feature = "bigint")]
 const TAG_BIG_INT: i64 = -10;
 const TAG_STRING: i64 = -7;
+const TAG_FUNCTION_BYTECODE: i64 = -2;
 const TAG_OBJECT: i64 = -1;
 const TAG_INT: i64 = 0;
 const TAG_BOOL: i64 = 1;
@@ -29,21 +30,15 @@ const TAG_UNDEFINED: i64 = 3;
 const TAG_EXCEPTION: i64 = 6;
 const TAG_FLOAT64: i64 = 7;
 
-/// Free a JSValue.
-/// This function is the equivalent of JS_FreeValue from quickjs, which can not
-/// be used due to being `static inline`.
+
+/// Free a JSValue. (decrease refcount and garbage collect if 0).
 unsafe fn free_value(context: *mut q::JSContext, value: q::JSValue) {
-    // All tags < 0 are garbage collected and need to be freed.
-    if value.tag < 0 {
-        // This transmute is OK since if tag < 0, the union will be a refcount
-        // pointer.
-        let ptr = value.u.ptr as *mut q::JSRefCountHeader;
-        let pref: &mut q::JSRefCountHeader = &mut *ptr;
-        pref.ref_count -= 1;
-        if pref.ref_count <= 0 {
-            q::__JS_FreeValue(context, value);
-        }
-    }
+    q::JS_FreeValue(context, value);
+}
+
+/// Dup a JSValue (increase refcount).
+unsafe fn dup_value(context: *mut q::JSContext, value: q::JSValue) {
+    q::JS_DupValue(context, value);
 }
 
 #[cfg(feature = "chrono")]
@@ -602,6 +597,15 @@ impl<'a> Drop for OwnedValueRef<'a> {
     }
 }
 
+impl<'a> Clone for OwnedValueRef<'a> {
+    fn clone(&self) -> Self {
+        Self::new(
+            self.context,
+            self.value
+        )
+    }
+}
+
 impl<'a> std::fmt::Debug for OwnedValueRef<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.value.tag {
@@ -613,6 +617,7 @@ impl<'a> std::fmt::Debug for OwnedValueRef<'a> {
             TAG_FLOAT64 => write!(f, "Float(?)"),
             TAG_STRING => write!(f, "String(?)"),
             TAG_OBJECT => write!(f, "Object(?)"),
+            TAG_FUNCTION_BYTECODE => write!(f, "Bytecode(?)"),
             _ => write!(f, "?"),
         }
     }
@@ -622,18 +627,23 @@ impl<'a> OwnedValueRef<'a> {
     pub fn new(context: &'a ContextWrapper, value: q::JSValue) -> Self {
         Self { context, value }
     }
+    pub fn new_dup(context: &'a ContextWrapper, value: q::JSValue) -> Self {
+        let ret = Self::new(context, value);
+        unsafe{dup_value(ret.context.context, ret.value)};
+        ret
+    }
 
-    /// Get the inner JSValue without freeing in drop.
-    ///
-    /// Unsafe because the caller is responsible for freeing the value.
-    //unsafe fn into_inner(mut self) -> q::JSValue {
-    //let v = self.value;
-    //self.value = q::JSValue {
-    //u: q::JSValueUnion { int32: 0 },
-    //tag: TAG_NULL,
-    //};
-    //v
-    //}
+    /// Get the inner JSValue without increasing ref count
+    pub(crate) fn into_inner(&self) -> &q::JSValue {
+        &self.value
+    }
+
+    /// Get the inner JSValue while increasing ref count, this is handy when you pass a JSValue to a new owner like e.g. setProperty
+    #[allow(dead_code)]
+    pub(crate) fn into_inner_dup(&self) -> &q::JSValue {
+        unsafe{dup_value(self.context.context, self.value)};
+        &self.value
+    }
 
     pub fn is_null(&self) -> bool {
         self.value.tag == TAG_NULL
@@ -653,6 +663,10 @@ impl<'a> OwnedValueRef<'a> {
 
     pub fn is_string(&self) -> bool {
         self.value.tag == TAG_STRING
+    }
+
+    pub fn is_compiled_function(&self) -> bool {
+        self.value.tag == TAG_FUNCTION_BYTECODE
     }
 
     pub fn to_string(&self) -> Result<String, ExecutionError> {
@@ -793,7 +807,7 @@ unsafe extern "C" fn native_module_init(
 /// Cleanup of the context happens in drop.
 pub struct ContextWrapper {
     runtime: *mut q::JSRuntime,
-    context: *mut q::JSContext,
+    pub(crate) context: *mut q::JSContext,
     /// Stores callback closures and quickjs data pointers.
     /// This array is write-only and only exists to ensure the lifetime of
     /// the closure.
@@ -933,7 +947,7 @@ impl ContextWrapper {
     }
 
     /// Get the last exception from the runtime, and if present, convert it to a ExceptionError.
-    fn get_exception(&self) -> Option<ExecutionError> {
+    pub(crate) fn get_exception(&self) -> Option<ExecutionError> {
         let raw = unsafe { q::JS_GetException(self.context) };
         let value = OwnedValueRef::new(self, raw);
 

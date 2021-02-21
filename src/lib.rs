@@ -40,6 +40,8 @@ pub mod console;
 mod droppable_value;
 mod value;
 
+mod utils;
+
 #[cfg(test)]
 mod tests;
 
