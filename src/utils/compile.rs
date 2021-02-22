@@ -71,9 +71,15 @@ pub fn run_compiled_function<'a>(
 pub fn to_bytecode(context: &ContextWrapper, compiled_func: &OwnedValueRef) -> Vec<u8> {
     assert!(compiled_func.is_compiled_function());
 
-    #[cfg(target_pointer_width = "64")]
+    #[cfg(all(
+        target_pointer_width = "64",
+        not(all(target_arch = "x86_64", target_os = "windows"))
+    ))]
     let mut len: u64 = 0;
-    #[cfg(any(target_pointer_width = "32", target_arch = "x86_64-pc-windows-gnu"))]
+    #[cfg(any(
+        target_pointer_width = "32",
+        all(target_arch = "x86_64", target_os = "windows")
+    ))]
     let mut len: u32 = 0;
 
     let slice_u8 = unsafe {
