@@ -49,7 +49,7 @@ pub fn run_compiled_function<'a>(
     compiled_func: &OwnedValueRef,
 ) -> Result<OwnedValueRef<'a>, ExecutionError> {
     assert!(compiled_func.is_compiled_function());
-    let val = unsafe { q::JS_EvalFunction(context.context, *compiled_func.into_inner()) };
+    let val = unsafe { q::JS_EvalFunction(context.context, *compiled_func.as_inner()) };
     let val_ref = OwnedValueRef::new(context, val);
     if val_ref.is_exception() {
         let ex_opt = context.get_exception();
@@ -79,7 +79,7 @@ pub fn to_bytecode(context: &ContextWrapper, compiled_func: &OwnedValueRef) -> V
         q::JS_WriteObject(
             context.context,
             &mut len,
-            *compiled_func.into_inner(),
+            *compiled_func.as_inner(),
             q::JS_WRITE_OBJ_BYTECODE as i32,
         )
     };

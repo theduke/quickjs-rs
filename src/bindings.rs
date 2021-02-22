@@ -623,13 +623,13 @@ impl<'a> OwnedValueRef<'a> {
     }
 
     /// Get the inner JSValue without increasing ref count
-    pub(crate) fn into_inner(&self) -> &q::JSValue {
+    pub(crate) fn as_inner(&self) -> &q::JSValue {
         &self.value
     }
 
     /// Get the inner JSValue while increasing ref count, this is handy when you pass a JSValue to a new owner like e.g. setProperty
     #[allow(dead_code)]
-    pub(crate) fn into_inner_dup(&self) -> &q::JSValue {
+    pub(crate) fn as_inner_dup(&self) -> &q::JSValue {
         unsafe { q::JS_DupValue(self.context.context, self.value) };
         &self.value
     }
