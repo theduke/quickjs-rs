@@ -686,6 +686,19 @@ impl<'a> OwnedValueRef<'a> {
             _ => Err(ValueError::UnexpectedType),
         }
     }
+
+    #[cfg(test)]
+    pub fn get_ref_count(&self) -> i32 {
+        if self.value.tag < 0 {
+            // This transmute is OK since if tag < 0, the union will be a refcount
+            // pointer.
+            let ptr = unsafe { self.value.u.ptr as *mut q::JSRefCountHeader };
+            let pref: &mut q::JSRefCountHeader = &mut unsafe { *ptr };
+            pref.ref_count
+        } else {
+            -1
+        }
+    }
 }
 
 /// Wraps an object from the quickjs runtime.

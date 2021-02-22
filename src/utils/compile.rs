@@ -49,7 +49,7 @@ pub fn run_compiled_function<'a>(
     compiled_func: &OwnedValueRef,
 ) -> Result<OwnedValueRef<'a>, ExecutionError> {
     assert!(compiled_func.is_compiled_function());
-    let val = unsafe { q::JS_EvalFunction(context.context, *compiled_func.as_inner()) };
+    let val = unsafe { q::JS_EvalFunction(context.context, *compiled_func.as_inner_dup()) };
     let val_ref = OwnedValueRef::new(context, val);
     if val_ref.is_exception() {
         let ex_opt = context.get_exception();
@@ -105,7 +105,7 @@ pub fn from_bytecode(
         let raw =
             unsafe { q::JS_ReadObject(context.context, buf, len, q::JS_READ_OBJ_BYTECODE as i32) };
 
-        let func_ref = OwnedValueRef::new_dup(context, raw);
+        let func_ref = OwnedValueRef::new(context, raw);
         if func_ref.is_exception() {
             let ex_opt = context.get_exception();
             if let Some(ex) = ex_opt {
@@ -159,7 +159,7 @@ pub mod tests {
 
         let func_res = compile(
             &ctx,
-            "let a_tb4 = 7; let b_tb4 = 5; a_tb4 * b_tb4;",
+            "{let a_tb4 = 7; let b_tb4 = 5; a_tb4 * b_tb4;}",
             "test_func.es",
         );
         let func = func_res.ok().expect("func compile failed");
@@ -178,5 +178,53 @@ pub mod tests {
                 panic!("run failed: {}", e);
             }
         }
+    }
+
+    #[test]
+    fn test_bytecode_bad_compile() {
+        let ctx = ContextWrapper::new(None).unwrap();
+
+        let func_res = compile(
+            &ctx,
+            "{the changes of me compil1ng a're slim to 0-0}",
+            "test_func_fail.es",
+        );
+        func_res.err().expect("func compiled unexpectedly");
+    }
+
+    #[test]
+    fn test_bytecode_bad_run() {
+        let ctx = ContextWrapper::new(None).unwrap();
+
+        let func_res = compile(&ctx, "let abcdef = 1;", "test_func_runfail.es");
+        let func = func_res.ok().expect("func compile failed");
+        assert_eq!(1, func.get_ref_count());
+
+        let bytecode: Vec<u8> = to_bytecode(&ctx, &func);
+
+        assert_eq!(1, func.get_ref_count());
+
+        drop(func);
+
+        assert!(!bytecode.is_empty());
+
+        let func2_res = from_bytecode(&ctx, bytecode);
+        let func2 = func2_res.ok().expect("could not read bytecode");
+        //should fail the second time you run this because abcdef is already defined
+
+        assert_eq!(1, func2.get_ref_count());
+
+        let run_res1 = run_compiled_function(&ctx, &func2)
+            .ok()
+            .expect("run 1 failed unexpectedly");
+        drop(run_res1);
+
+        assert_eq!(1, func2.get_ref_count());
+
+        let _run_res2 = run_compiled_function(&ctx, &func2)
+            .err()
+            .expect("run 2 succeeded unexpectedly");
+
+        assert_eq!(1, func2.get_ref_count());
     }
 }
