@@ -100,14 +100,16 @@ pub fn from_bytecode(
 ) -> Result<OwnedValueRef, ExecutionError> {
     assert!(!bytecode.is_empty());
     {
-        #[cfg(target_pointer_width = "64")]
-        let len = bytecode.len() as u64;
-        #[cfg(any(target_pointer_width = "32", target_arch = "x86_64-pc-windows-gnu"))]
-        let len = bytecode.len() as u32;
-
+        let len = bytecode.len();
         let buf = bytecode.as_ptr();
-        let raw =
-            unsafe { q::JS_ReadObject(context.context, buf, len, q::JS_READ_OBJ_BYTECODE as i32) };
+        let raw = unsafe {
+            q::JS_ReadObject(
+                context.context,
+                buf,
+                len as _,
+                q::JS_READ_OBJ_BYTECODE as i32,
+            )
+        };
 
         let func_ref = OwnedValueRef::new(context, raw);
         if func_ref.is_exception() {
