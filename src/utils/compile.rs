@@ -73,7 +73,7 @@ pub fn to_bytecode(context: &ContextWrapper, compiled_func: &OwnedValueRef) -> V
 
     #[cfg(target_pointer_width = "64")]
     let mut len: u64 = 0;
-    #[cfg(target_pointer_width = "32")]
+    #[cfg(any(target_pointer_width = "32", target_arch = "x86_64-pc-windows-gnu"))]
     let mut len: u32 = 0;
 
     let slice_u8 = unsafe {
@@ -102,7 +102,7 @@ pub fn from_bytecode(
     {
         #[cfg(target_pointer_width = "64")]
         let len = bytecode.len() as u64;
-        #[cfg(target_pointer_width = "32")]
+        #[cfg(any(target_pointer_width = "32", target_arch = "x86_64-pc-windows-gnu"))]
         let len = bytecode.len() as u32;
 
         let buf = bytecode.as_ptr();
