@@ -46,7 +46,7 @@ fn js_date_constructor(context: *mut q::JSContext) -> q::JSValue {
         )
     };
     assert_eq!(date_constructor.tag, TAG_OBJECT);
-    unsafe { free_value(context, global) };
+    unsafe { q::JS_FreeValue(context, global) };
     date_constructor
 }
 
@@ -65,7 +65,7 @@ fn js_create_bigint_function(context: *mut q::JSContext) -> q::JSValue {
         )
     };
     assert_eq!(bigint_function.tag, TAG_OBJECT);
-    unsafe { free_value(context, global) };
+    unsafe { q::JS_FreeValue(context, global) };
     bigint_function
 }
 
@@ -214,7 +214,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                 )
             };
             unsafe {
-                free_value(context, date_constructor);
+                q::JS_FreeValue(context, date_constructor);
             }
 
             if value.tag != TAG_OBJECT {
@@ -237,7 +237,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                     )
                 };
                 let s = DroppableValue::new(s, |&mut s| unsafe {
-                    free_value(context, s);
+                    q::JS_FreeValue(context, s);
                 });
                 if (*s).tag != TAG_STRING {
                     return Err(ValueError::Internal(
@@ -250,7 +250,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                 let bigint_function = js_create_bigint_function(context);
                 let bigint_function =
                     DroppableValue::new(bigint_function, |&mut bigint_function| unsafe {
-                        free_value(context, bigint_function);
+                        q::JS_FreeValue(context, bigint_function);
                     });
                 let js_bigint = unsafe {
                     q::JS_Call(
@@ -456,8 +456,8 @@ fn deserialize_value(
                             unsafe { q::JS_Call(context, getter, *r, 0, std::ptr::null_mut()) };
 
                         unsafe {
-                            free_value(context, getter);
-                            free_value(context, date_constructor);
+                            q::JS_FreeValue(context, getter);
+                            q::JS_FreeValue(context, date_constructor);
                         };
 
                         let res = if timestamp_raw.tag == TAG_FLOAT64 {
@@ -475,7 +475,7 @@ fn deserialize_value(
                         };
                         return res;
                     } else {
-                        unsafe { free_value(context, date_constructor) };
+                        unsafe { q::JS_FreeValue(context, date_constructor) };
                     }
                 }
 
