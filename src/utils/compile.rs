@@ -1,16 +1,22 @@
 //! Utils to compile script to bytecode and run script from bytecode
 
-use libquickjs_sys as q;
-use crate::bindings::{OwnedValueRef, ContextWrapper};
+use crate::bindings::{ContextWrapper, OwnedValueRef};
 use crate::ExecutionError;
+use libquickjs_sys as q;
 use std::ffi::CString;
 
 /// compile a script, will result in a JSValueRef with tag JS_TAG_FUNCTION_BYTECODE or JS_TAG_MODULE.
 ///  It can be executed with run_compiled_function().
 #[allow(dead_code)]
-pub fn compile<'a>(context: &'a ContextWrapper, script: &str, file_name: &str) -> Result<OwnedValueRef<'a>, ExecutionError> {
-    let filename_c = CString::new(file_name).map_err(|_e| { ExecutionError::Internal("cstring creation failed".to_string()) })?;
-    let code_c = CString::new(script).map_err(|_e| { ExecutionError::Internal("cstring creation failed".to_string()) })?;
+pub fn compile<'a>(
+    context: &'a ContextWrapper,
+    script: &str,
+    file_name: &str,
+) -> Result<OwnedValueRef<'a>, ExecutionError> {
+    let filename_c = CString::new(file_name)
+        .map_err(|_e| ExecutionError::Internal("cstring creation failed".to_string()))?;
+    let code_c = CString::new(script)
+        .map_err(|_e| ExecutionError::Internal("cstring creation failed".to_string()))?;
 
     let value_raw = unsafe {
         q::JS_Eval(
@@ -23,10 +29,7 @@ pub fn compile<'a>(context: &'a ContextWrapper, script: &str, file_name: &str) -
     };
 
     // check for error
-    let ret = OwnedValueRef::new(
-        context,
-        value_raw,
-    );
+    let ret = OwnedValueRef::new(context, value_raw);
     if ret.is_exception() {
         let ex_opt = context.get_exception();
         if let Some(ex) = ex_opt {
@@ -54,7 +57,7 @@ pub fn run_compiled_function<'a>(
             Err(ex)
         } else {
             Err(ExecutionError::Internal(
-                "run_compiled_function failed and could not get exception".to_string()
+                "run_compiled_function failed and could not get exception".to_string(),
             ))
         }
     } else {
@@ -68,9 +71,9 @@ pub fn to_bytecode(context: &ContextWrapper, compiled_func: &OwnedValueRef) -> V
     assert!(compiled_func.is_compiled_function());
 
     #[cfg(target_pointer_width = "64")]
-        let mut len: u64 = 0;
+    let mut len: u64 = 0;
     #[cfg(target_pointer_width = "32")]
-        let mut len: u32 = 0;
+    let mut len: u32 = 0;
 
     let slice_u8 = unsafe {
         q::JS_WriteObject(
@@ -95,12 +98,13 @@ pub fn from_bytecode(
     assert!(!bytecode.is_empty());
     {
         #[cfg(target_pointer_width = "64")]
-            let len = bytecode.len() as u64;
+        let len = bytecode.len() as u64;
         #[cfg(target_pointer_width = "32")]
-            let len = bytecode.len() as u32;
+        let len = bytecode.len() as u32;
 
         let buf = bytecode.as_ptr();
-        let raw = unsafe { q::JS_ReadObject(context.context, buf, len, q::JS_READ_OBJ_BYTECODE as i32) };
+        let raw =
+            unsafe { q::JS_ReadObject(context.context, buf, len, q::JS_READ_OBJ_BYTECODE as i32) };
 
         let func_ref = OwnedValueRef::new_dup(context, raw);
         if func_ref.is_exception() {
@@ -109,7 +113,7 @@ pub fn from_bytecode(
                 Err(ex)
             } else {
                 Err(ExecutionError::Internal(
-                    "from_bytecode failed and could not get exception".to_string()
+                    "from_bytecode failed and could not get exception".to_string(),
                 ))
             }
         } else {
@@ -120,20 +124,19 @@ pub fn from_bytecode(
 
 #[cfg(test)]
 pub mod tests {
-    use crate::utils::compile::{compile, to_bytecode, from_bytecode, run_compiled_function};
-    use crate::bindings::{ContextWrapper};
+    use crate::bindings::ContextWrapper;
+    use crate::utils::compile::{compile, from_bytecode, run_compiled_function, to_bytecode};
     use crate::JsValue;
 
     #[test]
     fn test_compile() {
         let ctx = ContextWrapper::new(None).unwrap();
 
-        let func_res =
-            compile(
-                &ctx,
-                "{let a_tb3 = 7; let b_tb3 = 5; a_tb3 * b_tb3;}",
-                "test_func.es",
-            );
+        let func_res = compile(
+            &ctx,
+            "{let a_tb3 = 7; let b_tb3 = 5; a_tb3 * b_tb3;}",
+            "test_func.es",
+        );
         let func = func_res.ok().expect("func compile failed");
         let bytecode: Vec<u8> = to_bytecode(&ctx, &func);
         drop(func);

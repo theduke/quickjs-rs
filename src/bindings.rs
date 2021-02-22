@@ -30,7 +30,6 @@ const TAG_UNDEFINED: i64 = 3;
 const TAG_EXCEPTION: i64 = 6;
 const TAG_FLOAT64: i64 = 7;
 
-
 /// Free a JSValue. (decrease refcount and garbage collect if 0).
 unsafe fn free_value(context: *mut q::JSContext, value: q::JSValue) {
     q::JS_FreeValue(context, value);
@@ -599,10 +598,7 @@ impl<'a> Drop for OwnedValueRef<'a> {
 
 impl<'a> Clone for OwnedValueRef<'a> {
     fn clone(&self) -> Self {
-        Self::new(
-            self.context,
-            self.value
-        )
+        Self::new(self.context, self.value)
     }
 }
 
@@ -629,7 +625,7 @@ impl<'a> OwnedValueRef<'a> {
     }
     pub fn new_dup(context: &'a ContextWrapper, value: q::JSValue) -> Self {
         let ret = Self::new(context, value);
-        unsafe{dup_value(ret.context.context, ret.value)};
+        unsafe { dup_value(ret.context.context, ret.value) };
         ret
     }
 
@@ -641,7 +637,7 @@ impl<'a> OwnedValueRef<'a> {
     /// Get the inner JSValue while increasing ref count, this is handy when you pass a JSValue to a new owner like e.g. setProperty
     #[allow(dead_code)]
     pub(crate) fn into_inner_dup(&self) -> &q::JSValue {
-        unsafe{dup_value(self.context.context, self.value)};
+        unsafe { dup_value(self.context.context, self.value) };
         &self.value
     }
 
