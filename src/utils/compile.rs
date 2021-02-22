@@ -85,7 +85,6 @@ pub fn to_bytecode(context: &ContextWrapper, compiled_func: &OwnedValueRef) -> V
     };
 
     let slice = unsafe { std::slice::from_raw_parts(slice_u8, len as usize) };
-
     slice.to_vec()
 }
 
