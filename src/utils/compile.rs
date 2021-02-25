@@ -8,7 +8,6 @@ use std::os::raw::c_void;
 
 /// compile a script, will result in a JSValueRef with tag JS_TAG_FUNCTION_BYTECODE or JS_TAG_MODULE.
 ///  It can be executed with run_compiled_function().
-#[allow(dead_code)]
 pub fn compile<'a>(
     context: &'a ContextWrapper,
     script: &str,
@@ -44,7 +43,6 @@ pub fn compile<'a>(
 }
 
 /// run a compiled function, see compile for an example
-#[allow(dead_code)]
 pub fn run_compiled_function<'a>(
     context: &'a ContextWrapper,
     compiled_func: &OwnedValueRef,
@@ -67,7 +65,6 @@ pub fn run_compiled_function<'a>(
 }
 
 /// write a function to bytecode
-#[allow(dead_code)]
 pub fn to_bytecode(context: &ContextWrapper, compiled_func: &OwnedValueRef) -> Vec<u8> {
     assert!(compiled_func.is_compiled_function());
 
@@ -84,17 +81,16 @@ pub fn to_bytecode(context: &ContextWrapper, compiled_func: &OwnedValueRef) -> V
 
     let slice = unsafe { std::slice::from_raw_parts(slice_u8, len as usize) };
     // it's a shame to copy the vec here but the alternative is to create a wrapping struct which free's the ptr on drop
-    let ret = slice.to_vec().clone();
+    let ret = slice.to_vec();
     unsafe { q::js_free(context.context, slice_u8 as *mut c_void) };
     ret
 }
 
 /// read a compiled function from bytecode, see to_bytecode for an example
-#[allow(dead_code)]
-pub fn from_bytecode(
-    context: &ContextWrapper,
-    bytecode: Vec<u8>,
-) -> Result<OwnedValueRef, ExecutionError> {
+pub fn from_bytecode<'a>(
+    context: &'a ContextWrapper,
+    bytecode: &[u8],
+) -> Result<OwnedValueRef<'a>, ExecutionError> {
     assert!(!bytecode.is_empty());
     {
         let len = bytecode.len();
@@ -143,7 +139,7 @@ pub mod tests {
         let bytecode: Vec<u8> = to_bytecode(&ctx, &func);
         drop(func);
         assert!(!bytecode.is_empty());
-        let func2_res = from_bytecode(&ctx, bytecode);
+        let func2_res = from_bytecode(&ctx, &bytecode);
         let func2 = func2_res.ok().expect("could not read bytecode");
         let run_res = run_compiled_function(&ctx, &func2);
         match run_res {
@@ -169,7 +165,7 @@ pub mod tests {
         let bytecode: Vec<u8> = to_bytecode(&ctx, &func);
         drop(func);
         assert!(!bytecode.is_empty());
-        let func2_res = from_bytecode(&ctx, bytecode);
+        let func2_res = from_bytecode(&ctx, &bytecode);
         let func2 = func2_res.ok().expect("could not read bytecode");
         let run_res = run_compiled_function(&ctx, &func2);
 
@@ -211,7 +207,7 @@ pub mod tests {
 
         assert!(!bytecode.is_empty());
 
-        let func2_res = from_bytecode(&ctx, bytecode);
+        let func2_res = from_bytecode(&ctx, &bytecode);
         let func2 = func2_res.ok().expect("could not read bytecode");
         //should fail the second time you run this because abcdef is already defined
 
