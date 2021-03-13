@@ -34,9 +34,9 @@ pub fn compile<'a>(
 
 /// run a compiled function, see compile for an example
 pub fn run_compiled_function<'a>(
-    context: &'a ContextWrapper,
     func: &'a JsCompiledFunction,
 ) -> Result<OwnedJsValue<'a>, ExecutionError> {
+    let context = func.as_value().context();
     let value = unsafe {
         // NOTE: JS_EvalFunction takes ownership.
         // We clone the func and extract the inner JsValue.
@@ -136,7 +136,7 @@ pub mod tests {
             .expect("could not read bytecode")
             .try_into_compiled_function()
             .unwrap();
-        let run_res = run_compiled_function(&ctx, &func2);
+        let run_res = run_compiled_function(&func2);
         match run_res {
             Ok(res) => {
                 assert_eq!(res.to_value().unwrap(), JsValue::Int(7 * 5));
@@ -170,7 +170,7 @@ pub mod tests {
             .expect("could not read bytecode")
             .try_into_compiled_function()
             .unwrap();
-        let run_res = run_compiled_function(&ctx, &func2);
+        let run_res = run_compiled_function(&func2);
 
         match run_res {
             Ok(res) => {
@@ -225,14 +225,14 @@ pub mod tests {
 
         assert_eq!(1, func2.as_value().get_ref_count());
 
-        let run_res1 = run_compiled_function(&ctx, &func2)
+        let run_res1 = run_compiled_function(&func2)
             .ok()
             .expect("run 1 failed unexpectedly");
         drop(run_res1);
 
         assert_eq!(1, func2.as_value().get_ref_count());
 
-        let _run_res2 = run_compiled_function(&ctx, &func2)
+        let _run_res2 = run_compiled_function(&func2)
             .err()
             .expect("run 2 succeeded unexpectedly");
 

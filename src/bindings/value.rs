@@ -196,10 +196,12 @@ impl<'a> Clone for OwnedJsAtom<'a> {
 ///
 /// Guarantees cleanup of resources by dropping the value from the runtime.
 ///
-/// Comparison to [`crate::JsValue`]:
+/// ### Comparison to [`crate::JsValue`]:
+///
 /// `JsValue` is a native Rust value that can be converted to QuickJs native
-/// types. `OwnedJsValue`, in constrast, owns the underlying QuickJs JsValue
-/// directly.
+/// types. `OwnedJsValue`, in contrast, owns the underlying QuickJs runtime
+/// value directly.
+// TODO: provide usage docs.
 pub struct OwnedJsValue<'a> {
     context: &'a ContextWrapper,
     // FIXME: make private again, just for testing
@@ -208,7 +210,12 @@ pub struct OwnedJsValue<'a> {
 
 impl<'a> OwnedJsValue<'a> {
     #[inline]
-    pub fn new(context: &'a ContextWrapper, value: q::JSValue) -> Self {
+    pub(crate) fn context(&self) -> &ContextWrapper {
+        self.context
+    }
+
+    #[inline]
+    pub(crate) fn new(context: &'a ContextWrapper, value: q::JSValue) -> Self {
         Self { context, value }
     }
 
@@ -233,85 +240,96 @@ impl<'a> OwnedJsValue<'a> {
         v
     }
 
+    /// Check if this value is `null`.
     #[inline]
     pub fn is_null(&self) -> bool {
         self.tag().is_null()
     }
 
+    /// Check if this value is `undefined`.
     #[inline]
     pub fn is_undefined(&self) -> bool {
         self.tag() == JsTag::Undefined
     }
 
+    /// Check if this value is `bool`.
     #[inline]
     pub fn is_bool(&self) -> bool {
         self.tag() == JsTag::Bool
     }
 
+    /// Check if this value is a Javascript exception.
     #[inline]
     pub fn is_exception(&self) -> bool {
         self.tag() == JsTag::Exception
     }
 
+    /// Check if this value is a Javascript object.
     #[inline]
     pub fn is_object(&self) -> bool {
         self.tag() == JsTag::Object
     }
 
+    /// Check if this value is a Javascript array.
     #[inline]
     pub fn is_array(&self) -> bool {
         unsafe { q::JS_IsArray(self.context.context, self.value) == 1 }
     }
 
+    /// Check if this value is a Javascript function.
     #[inline]
     pub fn is_function(&self) -> bool {
         unsafe { q::JS_IsFunction(self.context.context, self.value) == 1 }
     }
 
+    /// Check if this value is a Javascript module.
     #[inline]
     pub fn is_module(&self) -> bool {
         self.tag().is_module()
     }
 
+    /// Check if this value is a Javascript string.
     #[inline]
     pub fn is_string(&self) -> bool {
         self.tag() == JsTag::String
     }
 
+    /// Check if this value is a bytecode compiled function.
     #[inline]
     pub fn is_compiled_function(&self) -> bool {
         self.tag() == JsTag::FunctionBytecode
     }
 
+    /// Serialize this value into a [`JsValue`].
     pub fn to_value(&self) -> Result<JsValue, ValueError> {
         self.context.to_value(&self.value)
     }
 
-    pub fn to_bool(&self) -> Result<bool, ValueError> {
+    pub(crate) fn to_bool(&self) -> Result<bool, ValueError> {
         match self.to_value()? {
             JsValue::Bool(b) => Ok(b),
             _ => Err(ValueError::UnexpectedType),
         }
     }
 
-    pub fn try_into_object(self) -> Result<OwnedJsObject<'a>, ValueError> {
+    pub(crate) fn try_into_object(self) -> Result<OwnedJsObject<'a>, ValueError> {
         OwnedJsObject::try_from_value(self)
     }
 
-    pub fn try_into_function(self) -> Result<JsFunction<'a>, ValueError> {
+    pub(crate) fn try_into_function(self) -> Result<JsFunction<'a>, ValueError> {
         JsFunction::try_from_value(self)
     }
 
-    pub fn try_into_compiled_function(self) -> Result<JsCompiledFunction<'a>, ValueError> {
+    pub(crate) fn try_into_compiled_function(self) -> Result<JsCompiledFunction<'a>, ValueError> {
         JsCompiledFunction::try_from_value(self)
     }
 
-    pub fn try_into_module(self) -> Result<JsModule<'a>, ValueError> {
+    pub(crate) fn try_into_module(self) -> Result<JsModule<'a>, ValueError> {
         JsModule::try_from_value(self)
     }
 
     /// Call the Javascript `.toString()` method on this value.
-    pub fn js_to_string(&self) -> Result<String, ExecutionError> {
+    pub(crate) fn js_to_string(&self) -> Result<String, ExecutionError> {
         let value = if self.is_string() {
             self.to_value()?
         } else {
@@ -330,7 +348,7 @@ impl<'a> OwnedJsValue<'a> {
     }
 
     #[cfg(test)]
-    pub fn get_ref_count(&self) -> i32 {
+    pub(crate) fn get_ref_count(&self) -> i32 {
         if self.value.tag < 0 {
             // This transmute is OK since if tag < 0, the union will be a refcount
             // pointer.
@@ -538,6 +556,20 @@ impl<'a> JsCompiledFunction<'a> {
     pub(crate) fn into_value(self) -> OwnedJsValue<'a> {
         self.value
     }
+
+    /// Evaluate this compiled function and return the resulting value.
+    // FIXME: add example
+    pub fn eval(&'a self) -> Result<OwnedJsValue<'a>, ExecutionError> {
+        super::compile::run_compiled_function(self)
+    }
+
+    /// Convert this compiled function into QuickJS bytecode.
+    ///
+    /// Bytecode can be stored and loaded with [`Context::compile`].
+    // FIXME: add example
+    pub fn to_bytecode(&self) -> Result<Vec<u8>, ExecutionError> {
+        Ok(super::compile::to_bytecode(self.value.context, self))
+    }
 }
 
 /// A bytecode compiled module.
@@ -560,4 +592,11 @@ impl<'a> JsModule<'a> {
     pub fn into_value(self) -> OwnedJsValue<'a> {
         self.value
     }
+}
+
+/// The result of loading QuickJs bytecode.
+/// Either a function or a module.
+pub enum JsCompiledValue<'a> {
+    Function(JsCompiledFunction<'a>),
+    Module(JsModule<'a>),
 }

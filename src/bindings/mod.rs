@@ -20,9 +20,9 @@ use crate::{
 #[cfg(feature = "bigint")]
 use crate::value::{bigint::BigIntOrI64, BigInt};
 
-use value::{JsFunction, OwnedJsObject, OwnedJsValue};
+use value::{JsFunction, OwnedJsObject};
 
-pub use value::JsCompiledFunction;
+pub use value::{JsCompiledFunction, OwnedJsValue};
 
 // JS_TAG_* constants from quickjs.
 // For some reason bindgen does not pick them up.
