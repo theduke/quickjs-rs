@@ -1,5 +1,6 @@
 mod compile;
 mod convert;
+mod droppable_value;
 mod value;
 
 use std::{

@@ -37,7 +37,6 @@
 mod bindings;
 mod callback;
 pub mod console;
-mod droppable_value;
 mod value;
 
 pub mod utils;
