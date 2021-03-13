@@ -2,9 +2,9 @@ use std::{collections::HashMap, os::raw::c_char};
 
 use libquickjs_sys as q;
 
-use crate::{droppable_value::DroppableValue, JsValue, ValueError};
+use crate::{JsValue, ValueError};
 
-use super::make_cstring;
+use super::{droppable_value::DroppableValue, make_cstring};
 
 use super::{
     TAG_BOOL, TAG_EXCEPTION, TAG_FLOAT64, TAG_INT, TAG_NULL, TAG_OBJECT, TAG_STRING, TAG_UNDEFINED,
