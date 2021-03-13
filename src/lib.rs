@@ -39,15 +39,16 @@ mod callback;
 pub mod console;
 mod value;
 
-pub mod utils;
-
 #[cfg(test)]
 mod tests;
 
 use std::{convert::TryFrom, error, fmt};
 
-pub use callback::{Arguments, Callback};
-pub use value::*;
+pub use self::{
+    bindings::JsCompiledFunction,
+    callback::{Arguments, Callback},
+    value::*,
+};
 
 /// Error on Javascript execution.
 #[derive(PartialEq, Debug)]
