@@ -520,7 +520,7 @@ pub struct JsCompiledFunction<'a> {
 }
 
 impl<'a> JsCompiledFunction<'a> {
-    pub fn try_from_value(value: OwnedJsValue<'a>) -> Result<Self, ValueError> {
+    pub(crate) fn try_from_value(value: OwnedJsValue<'a>) -> Result<Self, ValueError> {
         if !value.is_compiled_function() {
             Err(ValueError::Internal(format!(
                 "Expected a compiled function, got {:?}",
@@ -531,11 +531,11 @@ impl<'a> JsCompiledFunction<'a> {
         }
     }
 
-    pub fn as_value(&self) -> &OwnedJsValue<'_> {
+    pub(crate) fn as_value(&self) -> &OwnedJsValue<'_> {
         &self.value
     }
 
-    pub fn into_value(self) -> OwnedJsValue<'a> {
+    pub(crate) fn into_value(self) -> OwnedJsValue<'a> {
         self.value
     }
 }
