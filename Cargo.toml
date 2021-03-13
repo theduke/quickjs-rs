@@ -14,6 +14,7 @@ keywords = ["quickjs", "javascript", "js", "engine", "interpreter"]
 features = [ "chrono", "bigint", "log" ]
 
 [features]
+default = ["chrono"]
 patched = ["libquickjs-sys/patched"]
 bigint = ["num-bigint", "num-traits", "libquickjs-sys/patched"]
 
