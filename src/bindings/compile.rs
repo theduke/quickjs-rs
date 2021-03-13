@@ -1,10 +1,10 @@
 //! Utils to compile script to bytecode and run script from bytecode
 
-use crate::bindings::{ContextWrapper, OwnedValueRef};
 use crate::ExecutionError;
 use libquickjs_sys as q;
-use std::ffi::CString;
 use std::os::raw::c_void;
+
+use super::{make_cstring, value::JsCompiledFunction, ContextWrapper, OwnedJsValue};
 
 /// compile a script, will result in a JSValueRef with tag JS_TAG_FUNCTION_BYTECODE or JS_TAG_MODULE.
 ///  It can be executed with run_compiled_function().
@@ -12,85 +12,72 @@ pub fn compile<'a>(
     context: &'a ContextWrapper,
     script: &str,
     file_name: &str,
-) -> Result<OwnedValueRef<'a>, ExecutionError> {
-    let filename_c = CString::new(file_name)
-        .map_err(|_e| ExecutionError::Internal("cstring creation failed".to_string()))?;
-    let code_c = CString::new(script)
-        .map_err(|_e| ExecutionError::Internal("cstring creation failed".to_string()))?;
+) -> Result<OwnedJsValue<'a>, ExecutionError> {
+    let filename_c = make_cstring(file_name)?;
+    let code_c = make_cstring(script)?;
 
-    let value_raw = unsafe {
-        q::JS_Eval(
+    let value = unsafe {
+        let v = q::JS_Eval(
             context.context,
             code_c.as_ptr(),
             script.len() as _,
             filename_c.as_ptr(),
             q::JS_EVAL_FLAG_COMPILE_ONLY as i32,
-        )
+        );
+        OwnedJsValue::new(context, v)
     };
 
     // check for error
-    let ret = OwnedValueRef::new(context, value_raw);
-    if ret.is_exception() {
-        let ex_opt = context.get_exception();
-        if let Some(ex) = ex_opt {
-            Err(ex)
-        } else {
-            Err(ExecutionError::Internal("Unknown error".to_string()))
-        }
-    } else {
-        Ok(ret)
-    }
+    context.ensure_no_excpetion()?;
+    Ok(value)
 }
 
 /// run a compiled function, see compile for an example
 pub fn run_compiled_function<'a>(
     context: &'a ContextWrapper,
-    compiled_func: &OwnedValueRef,
-) -> Result<OwnedValueRef<'a>, ExecutionError> {
-    assert!(compiled_func.is_compiled_function());
-    let val = unsafe { q::JS_EvalFunction(context.context, *compiled_func.as_inner_dup()) };
-    let val_ref = OwnedValueRef::new(context, val);
-    if val_ref.is_exception() {
-        let ex_opt = context.get_exception();
-        if let Some(ex) = ex_opt {
-            Err(ex)
+    func: &'a JsCompiledFunction,
+) -> Result<OwnedJsValue<'a>, ExecutionError> {
+    let value = unsafe {
+        // NOTE: JS_EvalFunction takes ownership.
+        // We clone the func and extract the inner JsValue.
+        let f = func.clone().into_value().extract();
+        let v = q::JS_EvalFunction(context.context, f);
+        OwnedJsValue::new(context, v)
+    };
+
+    context.ensure_no_excpetion().map_err(|e| {
+        if let ExecutionError::Internal(msg) = e {
+            ExecutionError::Internal(format!("Could not evaluate compiled function: {}", msg))
         } else {
-            Err(ExecutionError::Internal(
-                "run_compiled_function failed and could not get exception".to_string(),
-            ))
+            e
         }
-    } else {
-        Ok(val_ref)
-    }
+    })?;
+
+    Ok(value)
 }
 
 /// write a function to bytecode
-pub fn to_bytecode(context: &ContextWrapper, compiled_func: &OwnedValueRef) -> Vec<u8> {
-    assert!(compiled_func.is_compiled_function());
-
-    let mut len = 0;
-
-    let slice_u8 = unsafe {
-        q::JS_WriteObject(
+pub fn to_bytecode(context: &ContextWrapper, compiled_func: &JsCompiledFunction) -> Vec<u8> {
+    unsafe {
+        let mut len = 0;
+        let raw = q::JS_WriteObject(
             context.context,
             &mut len,
-            *compiled_func.as_inner(),
+            *compiled_func.as_value().as_inner(),
             q::JS_WRITE_OBJ_BYTECODE as i32,
-        )
-    };
-
-    let slice = unsafe { std::slice::from_raw_parts(slice_u8, len as usize) };
-    // it's a shame to copy the vec here but the alternative is to create a wrapping struct which free's the ptr on drop
-    let ret = slice.to_vec();
-    unsafe { q::js_free(context.context, slice_u8 as *mut c_void) };
-    ret
+        );
+        let slice = std::slice::from_raw_parts(raw, len as usize);
+        let data = slice.to_vec();
+        q::js_free(context.context, raw as *mut c_void);
+        data
+    }
 }
 
 /// read a compiled function from bytecode, see to_bytecode for an example
 pub fn from_bytecode<'a>(
     context: &'a ContextWrapper,
     bytecode: &[u8],
-) -> Result<OwnedValueRef<'a>, ExecutionError> {
+) -> Result<OwnedJsValue<'a>, ExecutionError> {
     assert!(!bytecode.is_empty());
     {
         let len = bytecode.len();
@@ -104,7 +91,7 @@ pub fn from_bytecode<'a>(
             )
         };
 
-        let func_ref = OwnedValueRef::new(context, raw);
+        let func_ref = OwnedJsValue::new(context, raw);
         if func_ref.is_exception() {
             let ex_opt = context.get_exception();
             if let Some(ex) = ex_opt {
@@ -122,12 +109,11 @@ pub fn from_bytecode<'a>(
 
 #[cfg(test)]
 pub mod tests {
-    use crate::bindings::ContextWrapper;
-    use crate::utils::compile::{compile, from_bytecode, run_compiled_function, to_bytecode};
+    use super::*;
     use crate::JsValue;
 
     #[test]
-    fn test_compile() {
+    fn test_compile_function() {
         let ctx = ContextWrapper::new(None).unwrap();
 
         let func_res = compile(
@@ -135,12 +121,21 @@ pub mod tests {
             "{let a_tb3 = 7; let b_tb3 = 5; a_tb3 * b_tb3;}",
             "test_func.es",
         );
-        let func = func_res.ok().expect("func compile failed");
+        let func = func_res
+            .ok()
+            .expect("func compile failed")
+            .try_into_compiled_function()
+            .unwrap();
         let bytecode: Vec<u8> = to_bytecode(&ctx, &func);
         drop(func);
         assert!(!bytecode.is_empty());
+
         let func2_res = from_bytecode(&ctx, &bytecode);
-        let func2 = func2_res.ok().expect("could not read bytecode");
+        let func2 = func2_res
+            .ok()
+            .expect("could not read bytecode")
+            .try_into_compiled_function()
+            .unwrap();
         let run_res = run_compiled_function(&ctx, &func2);
         match run_res {
             Ok(res) => {
@@ -153,7 +148,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_bytecode() {
+    fn test_load_and_eval_compiled_function() {
         let ctx = ContextWrapper::new(None).unwrap();
 
         let func_res = compile(
@@ -161,12 +156,20 @@ pub mod tests {
             "{let a_tb4 = 7; let b_tb4 = 5; a_tb4 * b_tb4;}",
             "test_func.es",
         );
-        let func = func_res.ok().expect("func compile failed");
+        let func = func_res
+            .ok()
+            .expect("func compile failed")
+            .try_into_compiled_function()
+            .unwrap();
         let bytecode: Vec<u8> = to_bytecode(&ctx, &func);
         drop(func);
         assert!(!bytecode.is_empty());
         let func2_res = from_bytecode(&ctx, &bytecode);
-        let func2 = func2_res.ok().expect("could not read bytecode");
+        let func2 = func2_res
+            .ok()
+            .expect("could not read bytecode")
+            .try_into_compiled_function()
+            .unwrap();
         let run_res = run_compiled_function(&ctx, &func2);
 
         match run_res {
@@ -180,7 +183,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_bytecode_bad_compile() {
+    fn test_load_compiled_function_fail() {
         let ctx = ContextWrapper::new(None).unwrap();
 
         let func_res = compile(
@@ -192,38 +195,47 @@ pub mod tests {
     }
 
     #[test]
-    fn test_bytecode_bad_run() {
+    fn test_compiled_func_bad_eval() {
         let ctx = ContextWrapper::new(None).unwrap();
 
         let func_res = compile(&ctx, "let abcdef = 1;", "test_func_runfail.es");
-        let func = func_res.ok().expect("func compile failed");
-        assert_eq!(1, func.get_ref_count());
+        let func = func_res
+            .ok()
+            .expect("func compile failed")
+            .try_into_compiled_function()
+            .unwrap();
+        assert_eq!(1, func.as_value().get_ref_count());
 
         let bytecode: Vec<u8> = to_bytecode(&ctx, &func);
 
-        assert_eq!(1, func.get_ref_count());
+        assert_eq!(1, func.as_value().get_ref_count());
 
         drop(func);
 
         assert!(!bytecode.is_empty());
 
         let func2_res = from_bytecode(&ctx, &bytecode);
-        let func2 = func2_res.ok().expect("could not read bytecode");
+        let func2 = func2_res
+            .ok()
+            .expect("could not read bytecode")
+            .try_into_compiled_function()
+            .unwrap();
+
         //should fail the second time you run this because abcdef is already defined
 
-        assert_eq!(1, func2.get_ref_count());
+        assert_eq!(1, func2.as_value().get_ref_count());
 
         let run_res1 = run_compiled_function(&ctx, &func2)
             .ok()
             .expect("run 1 failed unexpectedly");
         drop(run_res1);
 
-        assert_eq!(1, func2.get_ref_count());
+        assert_eq!(1, func2.as_value().get_ref_count());
 
         let _run_res2 = run_compiled_function(&ctx, &func2)
             .err()
             .expect("run 2 succeeded unexpectedly");
 
-        assert_eq!(1, func2.get_ref_count());
+        assert_eq!(1, func2.as_value().get_ref_count());
     }
 }

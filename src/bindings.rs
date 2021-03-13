@@ -1,21 +1,27 @@
+mod compile;
+mod convert;
+mod value;
+
 use std::{
-    collections::HashMap,
     ffi::CString,
-    os::raw::{c_char, c_int, c_void},
+    os::raw::{c_int, c_void},
     sync::Mutex,
 };
 
 use libquickjs_sys as q;
 
-#[cfg(feature = "bigint")]
-use crate::value::{bigint::BigIntOrI64, BigInt};
 use crate::{
     callback::{Arguments, Callback},
     console::ConsoleBackend,
-    droppable_value::DroppableValue,
     ContextError, ExecutionError, JsValue, ValueError,
 };
-use libquickjs_sys::JS_DupValue;
+
+#[cfg(feature = "bigint")]
+use crate::value::{bigint::BigIntOrI64, BigInt};
+
+use value::{OwnedJsObject, OwnedJsValue};
+
+use self::value::JsFunction;
 
 // JS_TAG_* constants from quickjs.
 // For some reason bindgen does not pick them up.
@@ -31,504 +37,9 @@ const TAG_UNDEFINED: i64 = 3;
 const TAG_EXCEPTION: i64 = 6;
 const TAG_FLOAT64: i64 = 7;
 
-#[cfg(feature = "chrono")]
-fn js_date_constructor(context: *mut q::JSContext) -> q::JSValue {
-    let global = unsafe { q::JS_GetGlobalObject(context) };
-    assert_eq!(global.tag, TAG_OBJECT);
-
-    let date_constructor = unsafe {
-        q::JS_GetPropertyStr(
-            context,
-            global,
-            std::ffi::CStr::from_bytes_with_nul(b"Date\0")
-                .unwrap()
-                .as_ptr(),
-        )
-    };
-    assert_eq!(date_constructor.tag, TAG_OBJECT);
-    unsafe { q::JS_FreeValue(context, global) };
-    date_constructor
-}
-
-#[cfg(feature = "bigint")]
-fn js_create_bigint_function(context: *mut q::JSContext) -> q::JSValue {
-    let global = unsafe { q::JS_GetGlobalObject(context) };
-    assert_eq!(global.tag, TAG_OBJECT);
-
-    let bigint_function = unsafe {
-        q::JS_GetPropertyStr(
-            context,
-            global,
-            std::ffi::CStr::from_bytes_with_nul(b"BigInt\0")
-                .unwrap()
-                .as_ptr(),
-        )
-    };
-    assert_eq!(bigint_function.tag, TAG_OBJECT);
-    unsafe { q::JS_FreeValue(context, global) };
-    bigint_function
-}
-
-/// Serialize a Rust value into a quickjs runtime value.
-fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSValue, ValueError> {
-    let v = match value {
-        JsValue::Undefined => q::JSValue {
-            u: q::JSValueUnion { int32: 0 },
-            tag: TAG_UNDEFINED,
-        },
-        JsValue::Null => q::JSValue {
-            u: q::JSValueUnion { int32: 0 },
-            tag: TAG_NULL,
-        },
-        JsValue::Bool(flag) => q::JSValue {
-            u: q::JSValueUnion {
-                int32: if flag { 1 } else { 0 },
-            },
-            tag: TAG_BOOL,
-        },
-        JsValue::Int(val) => q::JSValue {
-            u: q::JSValueUnion { int32: val },
-            tag: TAG_INT,
-        },
-        JsValue::Float(val) => q::JSValue {
-            u: q::JSValueUnion { float64: val },
-            tag: TAG_FLOAT64,
-        },
-        JsValue::String(val) => {
-            let qval = unsafe {
-                q::JS_NewStringLen(context, val.as_ptr() as *const c_char, val.len() as _)
-            };
-
-            if qval.tag == TAG_EXCEPTION {
-                return Err(ValueError::Internal(
-                    "Could not create string in runtime".into(),
-                ));
-            }
-
-            qval
-        }
-        JsValue::Array(values) => {
-            // Allocate a new array in the runtime.
-            let arr = unsafe { q::JS_NewArray(context) };
-            if arr.tag == TAG_EXCEPTION {
-                return Err(ValueError::Internal(
-                    "Could not create array in runtime".into(),
-                ));
-            }
-
-            for (index, value) in values.into_iter().enumerate() {
-                let qvalue = match serialize_value(context, value) {
-                    Ok(qval) => qval,
-                    Err(e) => {
-                        // Make sure to free the array if a individual element
-                        // fails.
-
-                        unsafe {
-                            q::JS_FreeValue(context, arr);
-                        }
-
-                        return Err(e);
-                    }
-                };
-
-                let ret = unsafe {
-                    q::JS_DefinePropertyValueUint32(
-                        context,
-                        arr,
-                        index as u32,
-                        qvalue,
-                        q::JS_PROP_C_W_E as i32,
-                    )
-                };
-                if ret < 0 {
-                    // Make sure to free the array if a individual
-                    // element fails.
-                    unsafe {
-                        q::JS_FreeValue(context, arr);
-                    }
-                    return Err(ValueError::Internal(
-                        "Could not append element to array".into(),
-                    ));
-                }
-            }
-            arr
-        }
-        JsValue::Object(map) => {
-            let obj = unsafe { q::JS_NewObject(context) };
-            if obj.tag == TAG_EXCEPTION {
-                return Err(ValueError::Internal("Could not create object".into()));
-            }
-
-            for (key, value) in map {
-                let ckey = make_cstring(key)?;
-
-                let qvalue = serialize_value(context, value).map_err(|e| {
-                    // Free the object if a property failed.
-                    unsafe {
-                        q::JS_FreeValue(context, obj);
-                    }
-                    e
-                })?;
-
-                let ret = unsafe {
-                    q::JS_DefinePropertyValueStr(
-                        context,
-                        obj,
-                        ckey.as_ptr(),
-                        qvalue,
-                        q::JS_PROP_C_W_E as i32,
-                    )
-                };
-                if ret < 0 {
-                    // Free the object if a property failed.
-                    unsafe {
-                        q::JS_FreeValue(context, obj);
-                    }
-                    return Err(ValueError::Internal(
-                        "Could not add add property to object".into(),
-                    ));
-                }
-            }
-
-            obj
-        }
-        #[cfg(feature = "chrono")]
-        JsValue::Date(datetime) => {
-            let date_constructor = js_date_constructor(context);
-
-            let f = datetime.timestamp_millis() as f64;
-
-            let timestamp = q::JSValue {
-                u: q::JSValueUnion { float64: f },
-                tag: TAG_FLOAT64,
-            };
-
-            let mut args = vec![timestamp];
-
-            let value = unsafe {
-                q::JS_CallConstructor(
-                    context,
-                    date_constructor,
-                    args.len() as i32,
-                    args.as_mut_ptr(),
-                )
-            };
-            unsafe {
-                q::JS_FreeValue(context, date_constructor);
-            }
-
-            if value.tag != TAG_OBJECT {
-                return Err(ValueError::Internal(
-                    "Could not construct Date object".into(),
-                ));
-            }
-            value
-        }
-        #[cfg(feature = "bigint")]
-        JsValue::BigInt(int) => match int.inner {
-            BigIntOrI64::Int(int) => unsafe { q::JS_NewBigInt64(context, int) },
-            BigIntOrI64::BigInt(bigint) => {
-                let bigint_string = bigint.to_str_radix(10);
-                let s = unsafe {
-                    q::JS_NewStringLen(
-                        context,
-                        bigint_string.as_ptr() as *const c_char,
-                        bigint_string.len() as q::size_t,
-                    )
-                };
-                let s = DroppableValue::new(s, |&mut s| unsafe {
-                    q::JS_FreeValue(context, s);
-                });
-                if (*s).tag != TAG_STRING {
-                    return Err(ValueError::Internal(
-                        "Could not construct String object needed to create BigInt object".into(),
-                    ));
-                }
-
-                let mut args = vec![*s];
-
-                let bigint_function = js_create_bigint_function(context);
-                let bigint_function =
-                    DroppableValue::new(bigint_function, |&mut bigint_function| unsafe {
-                        q::JS_FreeValue(context, bigint_function);
-                    });
-                let js_bigint = unsafe {
-                    q::JS_Call(
-                        context,
-                        *bigint_function,
-                        js_null_value(),
-                        1,
-                        args.as_mut_ptr(),
-                    )
-                };
-
-                if js_bigint.tag != TAG_BIG_INT {
-                    return Err(ValueError::Internal(
-                        "Could not construct BigInt object".into(),
-                    ));
-                }
-
-                js_bigint
-            }
-        },
-        JsValue::__NonExhaustive => unreachable!(),
-    };
-    Ok(v)
-}
-
-fn deserialize_array(
-    context: *mut q::JSContext,
-    raw_value: &q::JSValue,
-) -> Result<JsValue, ValueError> {
-    assert_eq!(raw_value.tag, TAG_OBJECT);
-
-    let length_name = make_cstring("length")?;
-
-    let len_raw = unsafe { q::JS_GetPropertyStr(context, *raw_value, length_name.as_ptr()) };
-
-    let len_res = deserialize_value(context, &len_raw);
-    unsafe { q::JS_FreeValue(context, len_raw) };
-    let len = match len_res? {
-        JsValue::Int(x) => x,
-        _ => {
-            return Err(ValueError::Internal(
-                "Could not determine array length".into(),
-            ));
-        }
-    };
-
-    let mut values = Vec::new();
-    for index in 0..(len as usize) {
-        let value_raw = unsafe { q::JS_GetPropertyUint32(context, *raw_value, index as u32) };
-        if value_raw.tag == TAG_EXCEPTION {
-            return Err(ValueError::Internal("Could not build array".into()));
-        }
-        let value_res = deserialize_value(context, &value_raw);
-        unsafe { q::JS_FreeValue(context, value_raw) };
-
-        let value = value_res?;
-        values.push(value);
-    }
-
-    Ok(JsValue::Array(values))
-}
-
-fn deserialize_object(context: *mut q::JSContext, obj: &q::JSValue) -> Result<JsValue, ValueError> {
-    assert_eq!(obj.tag, TAG_OBJECT);
-
-    let mut properties: *mut q::JSPropertyEnum = std::ptr::null_mut();
-    let mut count: u32 = 0;
-
-    let flags = (q::JS_GPN_STRING_MASK | q::JS_GPN_SYMBOL_MASK | q::JS_GPN_ENUM_ONLY) as i32;
-    let ret =
-        unsafe { q::JS_GetOwnPropertyNames(context, &mut properties, &mut count, *obj, flags) };
-    if ret != 0 {
-        return Err(ValueError::Internal(
-            "Could not get object properties".into(),
-        ));
-    }
-
-    // TODO: refactor into a more Rust-idiomatic iterator wrapper.
-    let properties = DroppableValue::new(properties, |&mut properties| {
-        for index in 0..count {
-            let prop = unsafe { properties.offset(index as isize) };
-            unsafe {
-                q::JS_FreeAtom(context, (*prop).atom);
-            }
-        }
-        unsafe {
-            q::js_free(context, properties as *mut std::ffi::c_void);
-        }
-    });
-
-    let mut map = HashMap::new();
-    for index in 0..count {
-        let prop = unsafe { (*properties).offset(index as isize) };
-        let raw_value = unsafe { q::JS_GetPropertyInternal(context, *obj, (*prop).atom, *obj, 0) };
-        if raw_value.tag == TAG_EXCEPTION {
-            return Err(ValueError::Internal("Could not get object property".into()));
-        }
-
-        let value_res = deserialize_value(context, &raw_value);
-        unsafe {
-            q::JS_FreeValue(context, raw_value);
-        }
-        let value = value_res?;
-
-        let key_value = unsafe { q::JS_AtomToString(context, (*prop).atom) };
-        if key_value.tag == TAG_EXCEPTION {
-            return Err(ValueError::Internal(
-                "Could not get object property name".into(),
-            ));
-        }
-
-        let key_res = deserialize_value(context, &key_value);
-        unsafe {
-            q::JS_FreeValue(context, key_value);
-        }
-        let key = match key_res? {
-            JsValue::String(s) => s,
-            _ => {
-                return Err(ValueError::Internal("Could not get property name".into()));
-            }
-        };
-        map.insert(key, value);
-    }
-
-    Ok(JsValue::Object(map))
-}
-
-fn deserialize_value(
-    context: *mut q::JSContext,
-    value: &q::JSValue,
-) -> Result<JsValue, ValueError> {
-    let r = value;
-
-    match r.tag {
-        // Int.
-        TAG_INT => {
-            let val = unsafe { r.u.int32 };
-            Ok(JsValue::Int(val))
-        }
-        // Bool.
-        TAG_BOOL => {
-            let raw = unsafe { r.u.int32 };
-            let val = raw > 0;
-            Ok(JsValue::Bool(val))
-        }
-        // Null.
-        TAG_NULL => Ok(JsValue::Null),
-        // Undefined.
-        TAG_UNDEFINED => Ok(JsValue::Undefined),
-        // Float.
-        TAG_FLOAT64 => {
-            let val = unsafe { r.u.float64 };
-            Ok(JsValue::Float(val))
-        }
-        // String.
-        TAG_STRING => {
-            let ptr = unsafe { q::JS_ToCStringLen2(context, std::ptr::null_mut(), *r, 0) };
-
-            if ptr.is_null() {
-                return Err(ValueError::Internal(
-                    "Could not convert string: got a null pointer".into(),
-                ));
-            }
-
-            let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
-
-            let s = cstr
-                .to_str()
-                .map_err(ValueError::InvalidString)?
-                .to_string();
-
-            // Free the c string.
-            unsafe { q::JS_FreeCString(context, ptr) };
-
-            Ok(JsValue::String(s))
-        }
-        // Object.
-        TAG_OBJECT => {
-            let is_array = unsafe { q::JS_IsArray(context, *r) } > 0;
-            if is_array {
-                deserialize_array(context, r)
-            } else {
-                #[cfg(feature = "chrono")]
-                {
-                    use chrono::offset::TimeZone;
-
-                    let date_constructor = js_date_constructor(context);
-                    let is_date = unsafe { q::JS_IsInstanceOf(context, *r, date_constructor) > 0 };
-
-                    if is_date {
-                        let getter = unsafe {
-                            q::JS_GetPropertyStr(
-                                context,
-                                *r,
-                                std::ffi::CStr::from_bytes_with_nul(b"getTime\0")
-                                    .unwrap()
-                                    .as_ptr(),
-                            )
-                        };
-                        assert_eq!(getter.tag, TAG_OBJECT);
-
-                        let timestamp_raw =
-                            unsafe { q::JS_Call(context, getter, *r, 0, std::ptr::null_mut()) };
-
-                        unsafe {
-                            q::JS_FreeValue(context, getter);
-                            q::JS_FreeValue(context, date_constructor);
-                        };
-
-                        let res = if timestamp_raw.tag == TAG_FLOAT64 {
-                            let f = unsafe { timestamp_raw.u.float64 } as i64;
-                            let datetime = chrono::Utc.timestamp_millis(f);
-                            Ok(JsValue::Date(datetime))
-                        } else if timestamp_raw.tag == TAG_INT {
-                            let f = unsafe { timestamp_raw.u.int32 } as i64;
-                            let datetime = chrono::Utc.timestamp_millis(f);
-                            Ok(JsValue::Date(datetime))
-                        } else {
-                            Err(ValueError::Internal(
-                                "Could not convert 'Date' instance to timestamp".into(),
-                            ))
-                        };
-                        return res;
-                    } else {
-                        unsafe { q::JS_FreeValue(context, date_constructor) };
-                    }
-                }
-
-                deserialize_object(context, r)
-            }
-        }
-        // BigInt
-        #[cfg(feature = "bigint")]
-        TAG_BIG_INT => {
-            let mut int: i64 = 0;
-            let ret = unsafe { q::JS_ToBigInt64(context, &mut int, *r) };
-            if ret == 0 {
-                Ok(JsValue::BigInt(BigInt {
-                    inner: BigIntOrI64::Int(int),
-                }))
-            } else {
-                let ptr = unsafe { q::JS_ToCStringLen2(context, std::ptr::null_mut(), *r, 0) };
-
-                if ptr.is_null() {
-                    return Err(ValueError::Internal(
-                        "Could not convert BigInt to string: got a null pointer".into(),
-                    ));
-                }
-
-                let cstr = unsafe { std::ffi::CStr::from_ptr(ptr) };
-                let bigint = num_bigint::BigInt::parse_bytes(cstr.to_bytes(), 10).unwrap();
-
-                // Free the c string.
-                unsafe { q::JS_FreeCString(context, ptr) };
-
-                Ok(JsValue::BigInt(BigInt {
-                    inner: BigIntOrI64::BigInt(bigint),
-                }))
-            }
-        }
-        x => Err(ValueError::Internal(format!(
-            "Unhandled JS_TAG value: {}",
-            x
-        ))),
-    }
-}
-
 /// Helper for creating CStrings.
 fn make_cstring(value: impl Into<Vec<u8>>) -> Result<CString, ValueError> {
     CString::new(value).map_err(ValueError::StringWithZeroBytes)
-}
-
-/// Helper to construct null JsValue
-fn js_null_value() -> q::JSValue {
-    q::JSValue {
-        u: q::JSValueUnion { int32: 0 },
-        tag: TAG_NULL,
-    }
 }
 
 type WrappedCallback = dyn Fn(c_int, *mut q::JSValue) -> q::JSValue;
@@ -618,7 +129,7 @@ impl<'a> OwnedValueRef<'a> {
     }
     pub fn new_dup(context: &'a ContextWrapper, value: q::JSValue) -> Self {
         let ret = Self::new(context, value);
-        unsafe { JS_DupValue(ret.context.context, ret.value) };
+        unsafe { q::JS_DupValue(ret.context.context, ret.value) };
         ret
     }
 
@@ -795,7 +306,7 @@ impl<'a> OwnedObjectRef<'a> {
         let qval = self.value.context.serialize_value(value)?;
         unsafe {
             // set_property_raw takes ownership, so we must prevent a free.
-            self.set_property_raw(name, qval.into_inner())?;
+            self.set_property_raw(name, qval.extract())?;
         }
         Ok(())
     }
@@ -946,47 +457,57 @@ impl ContextWrapper {
         Ok(s)
     }
 
-    pub fn serialize_value(&self, value: JsValue) -> Result<OwnedValueRef<'_>, ExecutionError> {
-        let serialized = serialize_value(self.context, value)?;
-        Ok(OwnedValueRef::new(self, serialized))
+    pub fn serialize_value(&self, value: JsValue) -> Result<OwnedJsValue<'_>, ExecutionError> {
+        let serialized = convert::serialize_value(self.context, value)?;
+        Ok(OwnedJsValue::new(self, serialized))
     }
 
     // Deserialize a quickjs runtime value into a Rust value.
-    fn to_value(&self, value: &q::JSValue) -> Result<JsValue, ValueError> {
-        deserialize_value(self.context, value)
+    pub(crate) fn to_value(&self, value: &q::JSValue) -> Result<JsValue, ValueError> {
+        convert::deserialize_value(self.context, value)
     }
 
     /// Get the global object.
-    pub fn global(&self) -> Result<OwnedObjectRef<'_>, ExecutionError> {
+    pub fn global(&self) -> Result<OwnedJsObject<'_>, ExecutionError> {
         let global_raw = unsafe { q::JS_GetGlobalObject(self.context) };
-        let global_ref = OwnedValueRef::new(self, global_raw);
-        let global = OwnedObjectRef::new(global_ref)?;
+        let global_ref = OwnedJsValue::new(self, global_raw);
+        let global = global_ref.try_into_object()?;
         Ok(global)
     }
 
     /// Get the last exception from the runtime, and if present, convert it to a ExceptionError.
     pub(crate) fn get_exception(&self) -> Option<ExecutionError> {
-        let raw = unsafe { q::JS_GetException(self.context) };
-        let value = OwnedValueRef::new(self, raw);
+        let value = unsafe {
+            let raw = q::JS_GetException(self.context);
+            OwnedJsValue::new(self, raw)
+        };
 
         if value.is_null() {
             None
+        } else if value.is_exception() {
+            Some(ExecutionError::Internal(
+                "Could get exception from runtime".into(),
+            ))
         } else {
-            let err = if value.is_exception() {
-                ExecutionError::Internal("Could get exception from runtime".into())
-            } else {
-                match value.to_string() {
-                    Ok(strval) => {
-                        if strval.contains("out of memory") {
-                            ExecutionError::OutOfMemory
-                        } else {
-                            ExecutionError::Exception(JsValue::String(strval))
-                        }
+            match value.js_to_string() {
+                Ok(strval) => {
+                    if strval.contains("out of memory") {
+                        Some(ExecutionError::OutOfMemory)
+                    } else {
+                        Some(ExecutionError::Exception(JsValue::String(strval)))
                     }
-                    Err(_) => ExecutionError::Internal("Unknown exception".into()),
                 }
-            };
-            Some(err)
+                Err(e) => Some(e),
+            }
+        }
+    }
+
+    /// Returns `Result::Err` when an error ocurred.
+    pub(crate) fn ensure_no_excpetion(&self) -> Result<(), ExecutionError> {
+        if let Some(e) = self.get_exception() {
+            Err(e)
+        } else {
+            Ok(())
         }
     }
 
@@ -994,15 +515,15 @@ impl ContextWrapper {
     /// resolved, and return the final value.
     fn resolve_value<'a>(
         &'a self,
-        value: OwnedValueRef<'a>,
-    ) -> Result<OwnedValueRef<'a>, ExecutionError> {
+        value: OwnedJsValue<'a>,
+    ) -> Result<OwnedJsValue<'a>, ExecutionError> {
         if value.is_exception() {
             let err = self
                 .get_exception()
                 .unwrap_or_else(|| ExecutionError::Exception("Unknown exception".into()));
             Err(err)
         } else if value.is_object() {
-            let obj = OwnedObjectRef::new(value)?;
+            let obj = value.try_into_object()?;
             if obj.is_promise()? {
                 self.eval(
                     r#"
@@ -1028,11 +549,13 @@ impl ContextWrapper {
                 )?;
 
                 let global = self.global()?;
-                let resolver = global.property("__resolvePromise")?;
+                let resolver = global
+                    .property_require("__resolvePromise")?
+                    .try_into_function()?;
 
                 // Call the resolver code that sets the result values once
                 // the promise resolves.
-                self.call_function(resolver, vec![obj.into_value()])?;
+                resolver.call(vec![obj.into_value()])?;
 
                 loop {
                     let flag = unsafe {
@@ -1048,15 +571,15 @@ impl ContextWrapper {
                     }
 
                     // Check if promise is finished.
-                    let res_val = global.property("__promiseResult")?;
+                    let res_val = global.property_require("__promiseResult")?;
                     if res_val.is_bool() {
                         let ok = res_val.to_bool()?;
-                        let value = global.property("__promiseValue")?;
+                        let value = global.property_require("__promiseValue")?;
 
                         if ok {
                             return self.resolve_value(value);
                         } else {
-                            let err_msg = value.to_string()?;
+                            let err_msg = value.js_to_string()?;
                             return Err(ExecutionError::Exception(JsValue::String(err_msg)));
                         }
                     }
@@ -1070,7 +593,7 @@ impl ContextWrapper {
     }
 
     /// Evaluate javascript code.
-    pub fn eval<'a>(&'a self, code: &str) -> Result<OwnedValueRef<'a>, ExecutionError> {
+    pub fn eval<'a>(&'a self, code: &str) -> Result<OwnedJsValue<'a>, ExecutionError> {
         let filename = "script.js";
         let filename_c = make_cstring(filename)?;
         let code_c = make_cstring(code)?;
@@ -1084,7 +607,7 @@ impl ContextWrapper {
                 q::JS_EVAL_TYPE_GLOBAL as i32,
             )
         };
-        let value = OwnedValueRef::new(self, value_raw);
+        let value = OwnedJsValue::new(self, value_raw);
         self.resolve_value(value)
     }
 
@@ -1092,9 +615,9 @@ impl ContextWrapper {
     /// Call a constructor function.
     fn call_constructor<'a>(
         &'a self,
-        function: OwnedValueRef<'a>,
-        args: Vec<OwnedValueRef<'a>>,
-    ) -> Result<OwnedValueRef<'a>, ExecutionError> {
+        function: OwnedJsValue<'a>,
+        args: Vec<OwnedJsValue<'a>>,
+    ) -> Result<OwnedJsValue<'a>, ExecutionError> {
         let mut qargs = args.iter().map(|arg| arg.value).collect::<Vec<_>>();
 
         let value_raw = unsafe {
@@ -1105,7 +628,7 @@ impl ContextWrapper {
                 qargs.as_mut_ptr(),
             )
         };
-        let value = OwnedValueRef::new(self, value_raw);
+        let value = OwnedJsValue::new(self, value_raw);
         if value.is_exception() {
             let err = self
                 .get_exception()
@@ -1120,22 +643,11 @@ impl ContextWrapper {
     /// Call a JS function with the given arguments.
     pub fn call_function<'a>(
         &'a self,
-        function: OwnedValueRef<'a>,
-        args: Vec<OwnedValueRef<'a>>,
-    ) -> Result<OwnedValueRef<'a>, ExecutionError> {
-        let mut qargs = args.iter().map(|arg| arg.value).collect::<Vec<_>>();
-
-        let qres_raw = unsafe {
-            q::JS_Call(
-                self.context,
-                function.value,
-                js_null_value(),
-                qargs.len() as i32,
-                qargs.as_mut_ptr(),
-            )
-        };
-        let qres = OwnedValueRef::new(self, qres_raw);
-        self.resolve_value(qres)
+        function: JsFunction<'a>,
+        args: Vec<OwnedJsValue<'a>>,
+    ) -> Result<OwnedJsValue<'a>, ExecutionError> {
+        let ret = function.call(args)?;
+        self.resolve_value(ret)
     }
 
     /// Helper for executing a callback closure.
@@ -1150,12 +662,12 @@ impl ContextWrapper {
 
             let args = arg_slice
                 .iter()
-                .map(|raw| deserialize_value(context, raw))
+                .map(|raw| convert::deserialize_value(context, raw))
                 .collect::<Result<Vec<_>, _>>()?;
 
             match callback.call(args) {
                 Ok(Ok(result)) => {
-                    let serialized = serialize_value(context, result)?;
+                    let serialized = convert::serialize_value(context, result)?;
                     Ok(serialized)
                 }
                 // TODO: better error reporting.
@@ -1174,7 +686,7 @@ impl ContextWrapper {
     pub fn create_callback<'a, F>(
         &'a self,
         callback: impl Callback<F> + 'static,
-    ) -> Result<q::JSValue, ExecutionError> {
+    ) -> Result<JsFunction<'a>, ExecutionError> {
         let argcount = callback.argument_count() as i32;
 
         let context = self.context;
@@ -1187,7 +699,8 @@ impl ContextWrapper {
                         ExecutionError::Exception(e) => e,
                         other => other.to_string().into(),
                     };
-                    let js_exception = serialize_value(context, js_exception_value).unwrap();
+                    let js_exception =
+                        convert::serialize_value(context, js_exception_value).unwrap();
                     unsafe {
                         q::JS_Throw(context, js_exception);
                     }
@@ -1204,13 +717,13 @@ impl ContextWrapper {
         let data = (&*pair.1) as *const q::JSValue as *mut q::JSValue;
         self.callbacks.lock().unwrap().push(pair);
 
-        let cfunc =
-            unsafe { q::JS_NewCFunctionData(self.context, trampoline, argcount, 0, 1, data) };
-        if cfunc.tag != TAG_OBJECT {
-            return Err(ExecutionError::Internal("Could not create callback".into()));
-        }
+        let obj = unsafe {
+            let f = q::JS_NewCFunctionData(self.context, trampoline, argcount, 0, 1, data);
+            OwnedJsValue::new(self, f)
+        };
 
-        Ok(cfunc)
+        let f = obj.try_into_function()?;
+        Ok(f)
     }
 
     pub fn add_callback<'a, F>(
@@ -1220,9 +733,7 @@ impl ContextWrapper {
     ) -> Result<(), ExecutionError> {
         let cfunc = self.create_callback(callback)?;
         let global = self.global()?;
-        unsafe {
-            global.set_property_raw(name, cfunc)?;
-        }
+        global.set_property(name, cfunc.into_value())?;
         Ok(())
     }
 }
