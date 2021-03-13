@@ -5,6 +5,10 @@
 // We use define simple wrapper functions to make them available to bindgen,
 // and therefore make them usable from Rust.
 
+int JS_ValueGetTag_real(JSValue v) {
+    return JS_VALUE_GET_TAG(v);
+}
+
 void JS_FreeValue_real(JSContext *ctx, JSValue v) {
     JS_FreeValue(ctx, v);
 }
