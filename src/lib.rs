@@ -45,7 +45,6 @@ mod tests;
 use std::{convert::TryFrom, error, fmt};
 
 pub use self::{
-    bindings::JsCompiledFunction,
     callback::{Arguments, Callback},
     value::*,
 };
