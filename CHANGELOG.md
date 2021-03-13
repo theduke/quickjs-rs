@@ -2,6 +2,8 @@
 
 ## Master branch
 
+* Enable chrono feature by default
+
 ## v0.4.0 - 2021-02-05
 
 * Bumped quickjs to `2020-11-08`
