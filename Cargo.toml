@@ -2,7 +2,7 @@
 edition = "2018"
 name = "quick-js"
 description = "QuickJS Javascript engine wrapper"
-version = "0.4.1-alpha.0"
+version = "0.4.2-alpha.0"
 readme = "README.md"
 documentation = "https://docs.rs/quick-js"
 repository = "https://github.com/theduke/quickjs-rs"
