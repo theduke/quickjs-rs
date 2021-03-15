@@ -605,3 +605,10 @@ fn test_console() {
         ]
     );
 }
+
+#[test]
+fn test_global_setter() {
+    let ctx = Context::new().unwrap();
+    ctx.set_global("a", "a").unwrap();
+    ctx.eval("a + 1").unwrap();
+}
