@@ -748,6 +748,9 @@ impl<'a> OwnedObjectRef<'a> {
         }
     }
 
+    // Set a property on an object.
+    // NOTE: this method takes ownership of the `JSValue`, so it must not be
+    // freed later.
     unsafe fn set_property_raw(&self, name: &str, value: q::JSValue) -> Result<(), ExecutionError> {
         let cname = make_cstring(name)?;
         let ret = q::JS_SetPropertyStr(
@@ -765,7 +768,12 @@ impl<'a> OwnedObjectRef<'a> {
 
     pub fn set_property(&self, name: &str, value: JsValue) -> Result<(), ExecutionError> {
         let qval = self.value.context.serialize_value(value)?;
-        unsafe { self.set_property_raw(name, qval.value) }
+        unsafe {
+            self.set_property_raw(name, qval.value)?;
+            // set_property_raw takes ownership, so we must prevent a free.
+            std::mem::forget(qval);
+        }
+        Ok(())
     }
 }
 
