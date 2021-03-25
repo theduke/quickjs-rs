@@ -275,6 +275,9 @@ fn call_async() {
 fn test_callback() {
     let c = Context::new().unwrap();
 
+    c.add_callback("no_arguments", || true).unwrap();
+    assert_eq!(c.eval_as::<bool>("no_arguments()").unwrap(), true);
+
     c.add_callback("cb1", |flag: bool| !flag).unwrap();
     assert_eq!(c.eval("cb1(true)").unwrap(), JsValue::Bool(false),);
 
@@ -292,6 +295,13 @@ fn test_callback() {
     c.add_callback("sum", |items: Vec<i32>| -> i32 { items.iter().sum() })
         .unwrap();
     assert_eq!(c.eval("sum([1, 2, 3, 4, 5, 6])").unwrap(), JsValue::Int(21),);
+
+    c.add_callback("identity", |value: JsValue| -> JsValue { value })
+        .unwrap();
+    {
+        let v = JsValue::from(22);
+        assert_eq!(c.eval("identity(22)").unwrap(), v);
+    }
 }
 
 #[test]
