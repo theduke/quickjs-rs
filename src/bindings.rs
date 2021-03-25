@@ -625,15 +625,12 @@ impl<'a> OwnedValueRef<'a> {
 
     /// Get the inner JSValue without freeing in drop.
     ///
-    /// Unsafe because the caller is responsible for freeing the value.
-    //unsafe fn into_inner(mut self) -> q::JSValue {
-    //let v = self.value;
-    //self.value = q::JSValue {
-    //u: q::JSValueUnion { int32: 0 },
-    //tag: TAG_NULL,
-    //};
-    //v
-    //}
+    /// Unsafe because the caller is responsible for freeing the returned value.
+    unsafe fn into_inner(self) -> q::JSValue {
+        let v = self.value;
+        std::mem::forget(self);
+        v
+    }
 
     pub fn is_null(&self) -> bool {
         self.value.tag == TAG_NULL
@@ -769,9 +766,8 @@ impl<'a> OwnedObjectRef<'a> {
     pub fn set_property(&self, name: &str, value: JsValue) -> Result<(), ExecutionError> {
         let qval = self.value.context.serialize_value(value)?;
         unsafe {
-            self.set_property_raw(name, qval.value)?;
             // set_property_raw takes ownership, so we must prevent a free.
-            std::mem::forget(qval);
+            self.set_property_raw(name, qval.into_inner())?;
         }
         Ok(())
     }
