@@ -4,7 +4,8 @@
 
 ## v0.4.1 - 2021-03-15
 
-* Fixed use after free in `set_global` (https://github.com/theduke/quickjs-rs/issues/105)
+* Fixed use after free in `set_global` [#105](https://github.com/theduke/quickjs-rs/issues/105)
+* `add_callback` can now take `JsValue` arguments [#109](https://github.com/theduke/quickjs-rs/issues/109)
 
 ## v0.4.0 - 2021-02-05
 
