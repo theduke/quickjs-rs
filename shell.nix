@@ -1,8 +1,11 @@
 { pkgs ? import <nixpkgs> {} }:
 
 pkgs.mkShell {
-    buildInputs = with pkgs; [
+    buildInput = with pkgs; [
+        pkgconfig
         gcc
+        stdenv.cc.cc.lib
+        stdenv.cc.cc
         just
         rust-bindgen
         cargo
