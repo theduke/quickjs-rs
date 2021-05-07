@@ -83,6 +83,7 @@ fn main() {
                 "libregexp.c",
                 "libunicode.c",
                 "quickjs.c",
+                "quickjs-port.c",
                 // Custom wrappers.
                 "static-functions.c",
             ]
@@ -95,6 +96,7 @@ fn main() {
             format!("\"{}\"", quickjs_version.trim()).as_str(),
         )
         .define("CONFIG_BIGNUM", None)
+        .flag_if_supported("/std:c11")
         // The below flags are used by the official Makefile.
         .flag_if_supported("-Wchar-subscripts")
         .flag_if_supported("-Wno-array-bounds")
