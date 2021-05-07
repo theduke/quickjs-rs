@@ -13,7 +13,6 @@ fn main() {
     panic!("Invalid config for crate libquickjs-sys: must enable either the 'bundled' or the 'system' feature");
 }
 
-#[cfg(feature = "system")]
 extern crate bindgen;
 
 #[cfg(feature = "system")]
@@ -46,13 +45,22 @@ fn main() {
 #[cfg(feature = "bundled")]
 fn main() {
     let embed_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("embed");
+    let quickjs_src_path = embed_path.join("quickjs");
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+
+    println!("cargo:rerun-if-changed=wrapper.h");
+    let binding = bindgen::builder()
+        .header("wrapper.h").clang_args(&["-I", embed_path.to_str().unwrap()])
+        .whitelist_function("(__)?(JS|js)_.*")
+        .whitelist_var("JS_.*")
+        .whitelist_type("JS.*").generate().unwrap();
+    binding.write_to_file(out_path.join("bindings.rs")).unwrap();
 
     let code_dir = out_path.join("quickjs");
     if exists(&code_dir) {
         std::fs::remove_dir_all(&code_dir).unwrap();
     }
-    copy_dir::copy_dir(embed_path.join("quickjs"), &code_dir)
+    copy_dir::copy_dir(&quickjs_src_path, &code_dir)
         .expect("Could not copy quickjs directory");
 
     #[cfg(feature = "patched")]
@@ -104,15 +112,7 @@ fn main() {
         .flag_if_supported("-Wno-cast-function-type")
         .flag_if_supported("-Wno-implicit-fallthrough")
         .flag_if_supported("-Wno-enum-conversion")
-        // cc uses the OPT_LEVEL env var by default, but we hardcode it to -O2
-        // since release builds use -O3 which might be problematic for quickjs,
-        // and debug builds only happen once anyway so the optimization slowdown
-        // is fine.
-        .opt_level(2)
         .compile(LIB_NAME);
-
-    std::fs::copy(embed_path.join("bindings.rs"), out_path.join("bindings.rs"))
-        .expect("Could not copy bindings.rs");
 }
 
 #[cfg(feature = "patched")]

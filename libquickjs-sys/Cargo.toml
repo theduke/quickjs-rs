@@ -18,9 +18,9 @@ bundled = ["cc", "copy_dir"]
 patched = ["bundled"]
 default = ["bundled"]
 
-system = ["bindgen"]
+system = []
 
 [build-dependencies]
-bindgen = { version = "0.57.0", optional = true }
+bindgen = { version = "0.57.0" }
 cc = { version = "1.0.66", optional = true }
 copy_dir = { version = "0.1.2", optional = true }
