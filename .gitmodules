@@ -1,3 +1,4 @@
 [submodule "libquickjs-sys/embed/quickjs"]
 	path = libquickjs-sys/embed/quickjs
-	url = https://github.com/c-smile/quickjspp
+	url = https://github.com/lygstate/quickjs
+	branch = msvc
