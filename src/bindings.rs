@@ -194,10 +194,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
 
             let f = datetime.timestamp_millis() as f64;
 
-            let timestamp = q::JSValue {
-                u: q::JSValueUnion { float64: f },
-                tag: TAG_FLOAT64,
-            };
+            let timestamp = unsafe { q::JS_NewFloat64(context, f) };
 
             let mut args = vec![timestamp];
 
@@ -552,18 +549,16 @@ where
         F: Fn(c_int, *mut q::JSValue) -> q::JSValue,
     {
         let closure_ptr = q::JS_VALUE_GET_PTR(*data);
-        let closure: &F = &*(closure_ptr as *mut F);
+        let closure: &F = &*(closure_ptr as *const F);
         (*closure)(argc, argv)
     }
 
     let boxed_f = Box::new(closure);
 
-    let data = Box::new(q::JSValue {
-        u: q::JSValueUnion {
-            ptr: (&*boxed_f) as *const F as *mut c_void,
-        },
-        tag: TAG_NULL,
-    });
+    let data = Box::new(q::JS_MKPTR(
+        TAG_NULL as c_int,
+        (&*boxed_f) as *const F as *mut c_void,
+    ));
 
     ((boxed_f, data), Some(trampoline::<F>))
 }
@@ -1143,11 +1138,7 @@ impl ContextWrapper {
                     let js_exception = serialize_value(context, js_exception_value).unwrap();
                     unsafe {
                         q::JS_Throw(context, js_exception);
-                    }
-
-                    q::JSValue {
-                        u: q::JSValueUnion { int32: 0 },
-                        tag: TAG_EXCEPTION,
+                        q::JS_EXCEPTION()
                     }
                 }
             }

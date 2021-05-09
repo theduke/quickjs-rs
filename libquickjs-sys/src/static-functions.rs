@@ -1,3 +1,5 @@
+use std::os::raw::{c_int, c_void};
+
 extern "C" {
     fn JS_DupValue_real(ctx: *mut JSContext, v: JSValue);
     fn JS_DupValueRT_real(rt: *mut JSRuntime, v: JSValue);
@@ -8,12 +10,14 @@ extern "C" {
     fn JS_NewFloat64_real(ctx: *mut JSContext, v: f64) -> JSValue;
     fn JS_NULL_real() -> JSValue;
     fn JS_UNDEFINED_real() -> JSValue;
+    fn JS_EXCEPTION_real() -> JSValue;
+    fn JS_MKPTR_real(tag: c_int, val: *mut c_void) -> JSValue;
     fn JS_VALUE_IS_NAN_real(v: JSValue) -> bool;
-    fn JS_VALUE_GET_INT_real(v: JSValue) -> ::std::os::raw::c_int;
-    fn JS_VALUE_GET_PTR_real(v: JSValue) -> *mut ::std::os::raw::c_void;
+    fn JS_VALUE_GET_INT_real(v: JSValue) -> c_int;
+    fn JS_VALUE_GET_PTR_real(v: JSValue) -> *mut c_void;
     fn JS_VALUE_GET_FLOAT64_real(v: JSValue) -> f64;
-    fn JS_VALUE_GET_TAG_real(v: JSValue) -> ::std::os::raw::c_int;
-    fn JS_VALUE_GET_NORM_TAG_real(v: JSValue) -> ::std::os::raw::c_int;
+    fn JS_VALUE_GET_TAG_real(v: JSValue) -> c_int;
+    fn JS_VALUE_GET_NORM_TAG_real(v: JSValue) -> c_int;
     fn JS_IsNumber_real(v: JSValue) -> bool;
     fn JS_IsBigInt_real(ctx: *mut JSContext, v: JSValue) -> bool;
     fn JS_IsBigFloat_real(v: JSValue) -> bool;
@@ -32,20 +36,20 @@ extern "C" {
         this_obj: JSValue,
         prop: JSAtom,
         val: JSValue,
-    ) -> ::std::os::raw::c_int;
+    ) -> c_int;
     fn JS_NewCFunction_real(
         ctx: *mut JSContext,
         func: *mut JSCFunction,
         name: *const ::std::os::raw::c_char,
-        length: ::std::os::raw::c_int,
+        length: c_int,
     ) -> JSValue;
     fn JS_NewCFunctionMagic_real(
         ctx: *mut JSContext,
         func: *mut JSCFunctionMagic,
         name: *const ::std::os::raw::c_char,
-        length: ::std::os::raw::c_int,
+        length: c_int,
         cproto: JSCFunctionEnum,
-        magic: ::std::os::raw::c_int,
+        magic: c_int,
     ) -> JSValue;
 }
 
@@ -98,18 +102,32 @@ pub unsafe fn JS_NewFloat64(ctx: *mut JSContext, v: f64) -> JSValue {
     JS_NewFloat64_real(ctx, v)
 }
 
-/// Get `null` JSValue
+/// get `null` JSValue
 /// # Safety
 /// be safe
 pub unsafe fn JS_NULL() -> JSValue {
     JS_NULL_real()
 }
 
-/// Get `undefined` JSValue
+/// get `undefined` JSValue
 /// # Safety
 /// be safe
 pub unsafe fn JS_UNDEFINED() -> JSValue {
     JS_UNDEFINED_real()
+}
+
+/// get exception JSValue
+/// # Safety
+/// be safe
+pub unsafe fn JS_EXCEPTION() -> JSValue {
+    JS_EXCEPTION_real()
+}
+
+/// create JSValue with ptr
+/// # Safety
+/// be safe
+pub unsafe fn JS_MKPTR(tag: c_int, ptr: *mut c_void) -> JSValue {
+    JS_MKPTR_real(tag, ptr)
 }
 
 /// check if a JSValue is a NaN value
@@ -122,7 +140,7 @@ pub unsafe fn JS_VALUE_IS_NAN(v: JSValue) -> bool {
 /// get a int value from a JSValue
 /// # Safety
 /// be safe
-pub unsafe fn JS_VALUE_GET_INT(v: JSValue) -> ::std::os::raw::c_int {
+pub unsafe fn JS_VALUE_GET_INT(v: JSValue) -> c_int {
     JS_VALUE_GET_INT_real(v)
 }
 
@@ -136,21 +154,21 @@ pub unsafe fn JS_VALUE_GET_FLOAT64(v: JSValue) -> f64 {
 /// get a ptr from a JSValue
 /// # Safety
 /// be safe
-pub unsafe fn JS_VALUE_GET_PTR(v: JSValue) -> *mut ::std::os::raw::c_void {
+pub unsafe fn JS_VALUE_GET_PTR(v: JSValue) -> *mut c_void {
     JS_VALUE_GET_PTR_real(v)
 }
 
 /// get the tag of a JSValue
 /// # Safety
 /// be safe
-pub unsafe fn JS_VALUE_GET_TAG(v: JSValue) -> ::std::os::raw::c_int {
+pub unsafe fn JS_VALUE_GET_TAG(v: JSValue) -> c_int {
     JS_VALUE_GET_TAG_real(v)
 }
 
 /// same as JS_VALUE_GET_TAG, but return JS_TAG_FLOAT64 with NaN boxing
 /// # Safety
 /// be safe
-pub unsafe fn JS_VALUE_GET_NORM_TAG(v: JSValue) -> ::std::os::raw::c_int {
+pub unsafe fn JS_VALUE_GET_NORM_TAG(v: JSValue) -> c_int {
     JS_VALUE_GET_NORM_TAG_real(v)
 }
 
@@ -253,7 +271,7 @@ pub unsafe fn JS_SetProperty(
     this_obj: JSValue,
     prop: JSAtom,
     val: JSValue,
-) -> ::std::os::raw::c_int {
+) -> c_int {
     JS_SetProperty_real(ctx, this_obj, prop, val)
 }
 
@@ -264,7 +282,7 @@ pub unsafe fn JS_NewCFunction(
     ctx: *mut JSContext,
     func: *mut JSCFunction,
     name: *const ::std::os::raw::c_char,
-    length: ::std::os::raw::c_int,
+    length: c_int,
 ) -> JSValue {
     JS_NewCFunction_real(ctx, func, name, length)
 }
@@ -276,9 +294,9 @@ pub unsafe fn JS_NewCFunctionMagic(
     ctx: *mut JSContext,
     func: *mut JSCFunctionMagic,
     name: *const ::std::os::raw::c_char,
-    length: ::std::os::raw::c_int,
+    length: c_int,
     cproto: JSCFunctionEnum,
-    magic: ::std::os::raw::c_int,
+    magic: c_int,
 ) -> JSValue {
     JS_NewCFunctionMagic_real(ctx, func, name, length, cproto, magic)
 }

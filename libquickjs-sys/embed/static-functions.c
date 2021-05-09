@@ -41,6 +41,14 @@ JSValue JS_UNDEFINED_real() {
   return JS_UNDEFINED;
 }
 
+JSValue JS_EXCEPTION_real() {
+  return JS_EXCEPTION;
+}
+
+JSValue JS_MKPTR_real(int tag, void *ptr) {
+  return JS_MKPTR(tag, ptr);
+}
+
 JS_BOOL JS_VALUE_IS_NAN_real(JSValue v) {
     return JS_VALUE_IS_NAN(v);
 }
