@@ -522,10 +522,7 @@ fn make_cstring(value: impl Into<Vec<u8>>) -> Result<CString, ValueError> {
 
 /// Helper to construct null JsValue
 fn js_null_value() -> q::JSValue {
-    q::JSValue {
-        u: q::JSValueUnion { int32: 0 },
-        tag: TAG_NULL,
-    }
+    unsafe { q::JS_NULL() }
 }
 
 type WrappedCallback = dyn Fn(c_int, *mut q::JSValue) -> q::JSValue;
@@ -555,7 +552,7 @@ where
         F: Fn(c_int, *mut q::JSValue) -> q::JSValue,
     {
         let closure_ptr = q::JS_VALUE_GET_PTR(*data);
-        let closure: &mut F = &mut *(closure_ptr as *mut F);
+        let closure: &F = &*(closure_ptr as *mut F);
         (*closure)(argc, argv)
     }
 
