@@ -50,18 +50,20 @@ fn main() {
 
     println!("cargo:rerun-if-changed=wrapper.h");
     let binding = bindgen::builder()
-        .header("wrapper.h").clang_args(&["-I", embed_path.to_str().unwrap()])
+        .header("wrapper.h")
+        .clang_args(&["-I", embed_path.to_str().unwrap()])
         .whitelist_function("(__)?(JS|js)_.*")
         .whitelist_var("JS_.*")
-        .whitelist_type("JS.*").generate().unwrap();
+        .whitelist_type("JS.*")
+        .generate()
+        .unwrap();
     binding.write_to_file(out_path.join("bindings.rs")).unwrap();
 
     let code_dir = out_path.join("quickjs");
     if exists(&code_dir) {
         std::fs::remove_dir_all(&code_dir).unwrap();
     }
-    copy_dir::copy_dir(&quickjs_src_path, &code_dir)
-        .expect("Could not copy quickjs directory");
+    copy_dir::copy_dir(&quickjs_src_path, &code_dir).expect("Could not copy quickjs directory");
 
     #[cfg(feature = "patched")]
     apply_patches(&code_dir);
