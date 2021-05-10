@@ -443,7 +443,7 @@ fn deserialize_value(
                                     .as_ptr(),
                             )
                         };
-                        assert!(unsafe { q::JS_IsObject(*raw_value) });
+                        assert!(unsafe { q::JS_IsObject(*r) });
 
                         let timestamp_raw =
                             unsafe { q::JS_Call(context, getter, *r, 0, std::ptr::null_mut()) };
@@ -453,7 +453,8 @@ fn deserialize_value(
                             free_value(context, date_constructor);
                         };
 
-                        let timestamp_tag = unsafe { q::JS_VALUE_GET_NORM_TAG(timestamp_raw) } as i64;
+                        let timestamp_tag =
+                            unsafe { q::JS_VALUE_GET_NORM_TAG(timestamp_raw) } as i64;
                         let res = if timestamp_tag == TAG_FLOAT64 {
                             let f = unsafe { q::JS_VALUE_GET_FLOAT64(timestamp_raw) } as i64;
                             let datetime = chrono::Utc.timestamp_millis(f);
