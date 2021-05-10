@@ -72,8 +72,8 @@ jobs:
 
     - name: Setup MSVC Command Prompt for i686 msvc target
       uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: amd64_x86
+      with:
+        arch: amd64_x86
       if: matrix.target == 'i686-pc-windows-msvc'
 
     - name: Set CARGO_BUILD_TARGET
