@@ -60,10 +60,8 @@ jobs:
 
     - name: Setup (windows)
       run: |
-        PATH="C:\\msys64\\mingw64\\bin;C:\\msys64\\usr\\bin;$PATH"
-        pacman --noconfirm -S mingw64/mingw-w64-x86_64-clang mingw32/mingw-w64-i686-clang
-        echo "PATH=$PATH" >> $GITHUB_ENV
-      shell: bash
+        C:\\msys64\\usr\\bin\\bash.exe -lc "pacman --noconfirm -S mingw64/mingw-w64-x86_64-clang mingw32/mingw-w64-i686-clang"
+        echo "PATH=C:\msys64\mingw64\bin;C:\msys64\usr\bin;${env:PATH}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       if: matrix.os == 'windows-latest'
 
     - name: Set CARGO_BUILD_TARGET
