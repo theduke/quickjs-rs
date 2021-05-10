@@ -116,7 +116,5 @@ jobs:
       if: matrix.target == 'x86_64-unknown-linux-gnu'
 
     - name: Check for leaks (Valgrind)
-      env:
-        QJS_TARGET: ${{ matrix.target }}
       run: just valgrind
       if: matrix.target == 'x86_64-unknown-linux-gnu'

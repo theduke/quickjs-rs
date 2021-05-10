@@ -2,7 +2,6 @@ embed_dir := "./libquickjs-sys/embed/quickjs"
 
 DOWNLOAD_URL := "https://bellard.org/quickjs/quickjs-2020-11-08.tar.xz"
 FEATURES := "--all-features"
-QJS_TARGET := ""
 
 download-new:
     test -d {{embed_dir}} && rm -r {{embed_dir}} || echo ""
@@ -54,4 +53,4 @@ lint:
 
 valgrind:
     echo "Checking for memory leaks..."
-    find target/{{QJS_TARGET}}/debug/deps -maxdepth 1 -type f -executable | xargs valgrind --leak-check=full --error-exitcode=1
+    find target/{{env_var_or_default("CARGO_BUILD_TARGET", "")}}/debug/deps -maxdepth 1 -type f -executable | xargs valgrind --leak-check=full --error-exitcode=1
