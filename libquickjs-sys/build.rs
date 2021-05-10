@@ -63,15 +63,9 @@ fn main() {
                 "quickjs-port.c",
             ]
             .iter()
-            .map(|f| quickjs_src_path.join(f))
-            .chain(
-                vec![
-                    // Custom wrappers.
-                    src_path.join("static-functions.c"),
-                ]
-                .drain(..),
-            ),
+            .map(|f| quickjs_src_path.join(f)),
         )
+        .file(src_path.join("static-functions.c"))
         .define("_GNU_SOURCE", None)
         .define(
             "CONFIG_VERSION",
