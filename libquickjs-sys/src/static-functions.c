@@ -1,4 +1,4 @@
-#include "quickjs.h"
+#include "quickjs/quickjs.h"
 
 // These are static inline functions in quickjs.h so bindgen does not pick 
 // them up.

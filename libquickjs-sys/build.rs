@@ -2,10 +2,6 @@ use std::path::{Path, PathBuf};
 
 use std::env;
 
-fn exists(path: impl AsRef<Path>) -> bool {
-    PathBuf::from(path.as_ref()).exists()
-}
-
 const LIB_NAME: &str = "quickjs";
 
 #[cfg(all(not(feature = "system"), not(feature = "bundled")))]
@@ -44,14 +40,12 @@ fn main() {
 
 #[cfg(feature = "bundled")]
 fn main() {
-    let embed_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("embed");
-    let quickjs_src_path = embed_path.join("quickjs");
+    let src_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("src");
+    let quickjs_src_path = src_path.join("quickjs");
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    println!("cargo:rerun-if-changed=wrapper.h");
     let binding = bindgen::builder()
-        .header("wrapper.h")
-        .clang_args(&["-I", embed_path.to_str().unwrap()])
+        .header(src_path.join("wrapper.h").to_str().unwrap().to_string())
         .whitelist_function("(__)?(JS|js)_.*")
         .whitelist_var("JS_.*")
         .whitelist_type("JS.*")
@@ -59,24 +53,8 @@ fn main() {
         .unwrap();
     binding.write_to_file(out_path.join("bindings.rs")).unwrap();
 
-    let code_dir = out_path.join("quickjs");
-    if exists(&code_dir) {
-        std::fs::remove_dir_all(&code_dir).unwrap();
-    }
-    copy_dir::copy_dir(&quickjs_src_path, &code_dir).expect("Could not copy quickjs directory");
-
-    #[cfg(feature = "patched")]
-    apply_patches(&code_dir);
-
-    std::fs::copy(
-        embed_path.join("static-functions.c"),
-        code_dir.join("static-functions.c"),
-    )
-    .expect("Could not copy static-functions.c");
-
-    eprintln!("Compiling quickjs...");
-    let quickjs_version =
-        std::fs::read_to_string(code_dir.join("VERSION")).expect("failed to read quickjs version");
+    let quickjs_version = std::fs::read_to_string(quickjs_src_path.join("VERSION"))
+        .expect("failed to read quickjs version");
     cc::Build::new()
         .files(
             [
@@ -86,11 +64,16 @@ fn main() {
                 "libunicode.c",
                 "quickjs.c",
                 "quickjs-port.c",
-                // Custom wrappers.
-                "static-functions.c",
             ]
             .iter()
-            .map(|f| code_dir.join(f)),
+            .map(|f| quickjs_src_path.join(f))
+            .chain(
+                vec![
+                    // Custom wrappers.
+                    src_path.join("static-functions.c"),
+                ]
+                .drain(..),
+            ),
         )
         .define("_GNU_SOURCE", None)
         .define(
@@ -117,29 +100,4 @@ fn main() {
         .flag_if_supported("-Wno-implicit-fallthrough")
         .flag_if_supported("-Wno-enum-conversion")
         .compile(LIB_NAME);
-}
-
-#[cfg(feature = "patched")]
-fn apply_patches(code_dir: &PathBuf) {
-    use std::fs;
-
-    eprintln!("Applying patches...");
-    let embed_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("embed");
-    let patches_path = embed_path.join("patches");
-    for patch in fs::read_dir(patches_path).expect("Could not open patches directory") {
-        let patch = patch.expect("Could not open patch");
-        eprintln!("Applying {:?}...", patch.file_name());
-        let status = std::process::Command::new("patch")
-            .current_dir(&code_dir)
-            .arg("-i")
-            .arg(patch.path())
-            .spawn()
-            .expect("Could not apply patches")
-            .wait()
-            .expect("Could not apply patches");
-        assert!(
-            status.success(),
-            "Patch command returned non-zero exit code"
-        );
-    }
 }
