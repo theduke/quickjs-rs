@@ -60,6 +60,7 @@ jobs:
 
     - name: Install libclang (windows)
       run: choco install llvm
+      run: choco install -y llvm
       if: matrix.os == 'windows-latest'
 
     - name: Setup mingw32 for i686 gnu target
