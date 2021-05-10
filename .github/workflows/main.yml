@@ -65,11 +65,11 @@ jobs:
       if: contains(matrix.target, 'windows-gnu')
 
     - name: Set CARGO_BUILD_TARGET
+      env:
+        QJS_TARGET: ${{ matrix.target }}
       run: |
         echo "CARGO_BUILD_TARGET=$QJS_TARGET" >> $GITHUB_ENV
       shell: bash
-      env:
-        QJS_TARGET: ${{ matrix.target }}
 
 
     - name: Build (default features)
@@ -113,8 +113,10 @@ jobs:
 
     - name: Lint
       run: just lint
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.target == 'x86_64-unknown-linux-gnu'
 
     - name: Check for leaks (Valgrind)
+      env:
+        QJS_TARGET: ${{ matrix.target }}
       run: just valgrind
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.target == 'x86_64-unknown-linux-gnu'

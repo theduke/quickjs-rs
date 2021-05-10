@@ -53,4 +53,4 @@ lint:
 
 valgrind:
     echo "Checking for memory leaks..."
-    find target/debug/deps -maxdepth 1 -type f -executable | xargs valgrind --leak-check=full --error-exitcode=1
+    find target/{{QJS_TARGET}}/debug/deps -maxdepth 1 -type f -executable | xargs valgrind --leak-check=full --error-exitcode=1
