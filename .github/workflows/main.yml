@@ -60,7 +60,7 @@ jobs:
 
     - name: Install LLVM
       run: |
-        C:\\msys64\\usr\\bin\\bash.exe -lc "pacman --noconfirm -R mingw-w64-x86_64-clang"
+        C:\\msys64\\usr\\bin\\bash.exe -lc "pacman --noconfirm -R mingw-w64-x86_64-clang-tools-extra mingw-w64-x86_64-clang"
         choco install -y llvm
       if: matrix.os == 'windows-latest'
 
