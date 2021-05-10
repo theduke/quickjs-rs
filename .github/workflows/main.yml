@@ -61,7 +61,6 @@ jobs:
     - name: Install libclang (windows)
       run: |
         C:\\msys64\\usr\\bin\\bash.exe -lc "pacman --noconfirm -S mingw64/mingw-w64-x86_64-clang"
-        echo "PATH=C:\msys64\mingw64\bin;${env:PATH}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       if: matrix.os == 'windows-latest'
 
     - name: Setup mingw32 for i686 target
