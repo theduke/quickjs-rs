@@ -60,8 +60,9 @@ jobs:
 
     - name: Setup (windows)
       run: |
-        C:\msys64\usr\bin\bash -lc 'pacman --noconfirm -S mingw64/mingw-w64-x86_64-clang mingw32/mingw-w64-i686-clang'
-        echo "PATH=C:\msys64\mingw64\bin;C:\msys64\usr\bin;$PATH" >> $GITHUB_ENV
+        PATH="C:\\msys64\\mingw64\\bin;C:\\msys64\\usr\\bin;$PATH"
+        pacman --noconfirm -S mingw64/mingw-w64-x86_64-clang mingw32/mingw-w64-i686-clang
+        echo "PATH=$PATH" >> $GITHUB_ENV
       shell: bash
       if: matrix.os == 'windows-latest'
 
