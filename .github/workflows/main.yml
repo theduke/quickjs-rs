@@ -58,11 +58,13 @@ jobs:
         sudo apt-get install -y curl xz-utils build-essential gcc-multilib valgrind
       if: matrix.os == 'ubuntu-latest'
 
-    - name: Setup (windows gnu)
+    - name: Setup (windows)
       run: |
-        $env:PATH = "C:\msys64\mingw64\bin;C:\msys64\usr\bin;$env:PATH"
-        echo "PATH=${env:PATH}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      if: contains(matrix.target, 'windows-gnu')
+        PATH = "C:\msys64\mingw64\bin;C:\msys64\usr\bin;$PATH"
+        pacman -S mingw64/mingw-w64-x86_64-clang mingw32/mingw-w64-i686-clang
+        echo "PATH=$PATH" >> $GITHUB_ENV
+      shell: bash
+      if: matrix.os == 'windows-latest'
 
     - name: Set CARGO_BUILD_TARGET
       env:
