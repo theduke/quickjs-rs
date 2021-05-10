@@ -58,10 +58,14 @@ jobs:
         sudo apt-get install -y curl xz-utils build-essential gcc-multilib valgrind
       if: matrix.os == 'ubuntu-latest'
 
-    - name: Setup (windows)
+    - name: Install LLVM (windows)
+      run: choco install -y llvm
+      if: matrix.os == 'windows-latest'
+
+    - name: Setup msys64 (windows)
       run: |
-        C:\\msys64\\usr\\bin\\bash.exe -lc "pacman --noconfirm -S mingw64/mingw-w64-x86_64-clang mingw32/mingw-w64-i686-clang"
-        echo "PATH=C:\msys64\mingw64\bin;C:\msys64\usr\bin;${env:PATH}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        C:\\msys64\\usr\\bin\\bash.exe -lc "pacman --noconfirm -S mingw32/mingw-w64-i686-clang"
+        echo "PATH=C:\msys64\mingw32\bin;C:\msys64\usr\bin;${env:PATH}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       if: matrix.os == 'windows-latest'
 
     - name: Set CARGO_BUILD_TARGET
