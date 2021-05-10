@@ -210,7 +210,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                 free_value(context, date_constructor);
             }
 
-            if unsafe { q::JS_IsObject(value) } {
+            if unsafe { !q::JS_IsObject(value) } {
                 return Err(ValueError::Internal(
                     "Could not construct Date object".into(),
                 ));
@@ -232,7 +232,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                 let s = DroppableValue::new(s, |&mut s| unsafe {
                     free_value(context, s);
                 });
-                if unsafe { q::JS_IsString(*s) } {
+                if unsafe { !q::JS_IsString(*s) } {
                     return Err(ValueError::Internal(
                         "Could not construct String object needed to create BigInt object".into(),
                     ));
@@ -255,7 +255,7 @@ fn serialize_value(context: *mut q::JSContext, value: JsValue) -> Result<q::JSVa
                     )
                 };
 
-                if unsafe { q::JS_IsBigInt(context, js_bigint) } {
+                if unsafe { !q::JS_IsBigInt(context, js_bigint) } {
                     return Err(ValueError::Internal(
                         "Could not construct BigInt object".into(),
                     ));
