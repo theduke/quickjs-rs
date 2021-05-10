@@ -38,18 +38,18 @@ mod tests {
                 JS_EVAL_TYPE_GLOBAL as i32,
             );
 
-            assert_eq!(JS_VALUE_GET_TAG(value), 0);
+            assert_eq!(JS_VALUE_GET_NORM_TAG(value), 0);
             assert_eq!(JS_VALUE_GET_INT(value), 2);
 
             JS_DupValue(ctx, value);
             JS_FreeValue(ctx, value);
 
             let ival = JS_NewInt32(ctx, 12);
-            assert_eq!(JS_VALUE_GET_TAG(ival), 0);
+            assert_eq!(JS_VALUE_GET_NORM_TAG(ival), 0);
             let fval = JS_NewFloat64(ctx, f64::MAX);
-            assert_eq!(JS_VALUE_GET_TAG(fval), 7);
+            assert_eq!(JS_VALUE_GET_NORM_TAG(fval), 7);
             let bval = JS_NewBool(ctx, true);
-            assert_eq!(JS_VALUE_GET_TAG(bval), 1);
+            assert_eq!(JS_VALUE_GET_NORM_TAG(bval), 1);
         }
     }
 }

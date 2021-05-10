@@ -34,7 +34,7 @@ const TAG_FLOAT64: i64 = 7;
 /// be used due to being `static inline`.
 unsafe fn free_value(context: *mut q::JSContext, value: q::JSValue) {
     // All tags < 0 are garbage collected and need to be freed.
-    if q::JS_VALUE_GET_TAG(value) < 0 {
+    if q::JS_VALUE_GET_NORM_TAG(value) < 0 {
         // This transmute is OK since if tag < 0, the union will be a refcount
         // pointer.
         let ptr = q::JS_VALUE_GET_PTR(value) as *mut q::JSRefCountHeader;
@@ -377,7 +377,7 @@ fn deserialize_value(
 ) -> Result<JsValue, ValueError> {
     let r = value;
 
-    match unsafe { q::JS_VALUE_GET_TAG(*r) } as i64 {
+    match unsafe { q::JS_VALUE_GET_NORM_TAG(*r) } as i64 {
         // Int.
         TAG_INT => {
             let val = unsafe { q::JS_VALUE_GET_INT(*r) };
@@ -453,7 +453,7 @@ fn deserialize_value(
                             free_value(context, date_constructor);
                         };
 
-                        let timestamp_tag = unsafe { q::JS_VALUE_GET_TAG(timestamp_raw) } as i64;
+                        let timestamp_tag = unsafe { q::JS_VALUE_GET_NORM_TAG(timestamp_raw) } as i64;
                         let res = if timestamp_tag == TAG_FLOAT64 {
                             let f = unsafe { q::JS_VALUE_GET_FLOAT64(timestamp_raw) } as i64;
                             let datetime = chrono::Utc.timestamp_millis(f);
@@ -580,7 +580,7 @@ impl<'a> Drop for OwnedValueRef<'a> {
 
 impl<'a> std::fmt::Debug for OwnedValueRef<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match unsafe { q::JS_VALUE_GET_TAG(self.value) } as i64 {
+        match unsafe { q::JS_VALUE_GET_NORM_TAG(self.value) } as i64 {
             TAG_EXCEPTION => write!(f, "Exception(?)"),
             TAG_NULL => write!(f, "NULL"),
             TAG_UNDEFINED => write!(f, "UNDEFINED"),
@@ -683,7 +683,7 @@ impl<'a> OwnedObjectRef<'a> {
         let raw = unsafe {
             q::JS_GetPropertyStr(self.value.context.context, self.value.value, cname.as_ptr())
         };
-        let t = unsafe { q::JS_VALUE_GET_TAG(raw) } as i64;
+        let t = unsafe { q::JS_VALUE_GET_NORM_TAG(raw) } as i64;
         unsafe {
             free_value(self.value.context.context, raw);
         }
