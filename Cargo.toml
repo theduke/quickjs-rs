@@ -14,8 +14,7 @@ keywords = ["quickjs", "javascript", "js", "engine", "interpreter"]
 features = [ "chrono", "bigint", "log" ]
 
 [features]
-patched = ["libquickjs-sys/patched"]
-bigint = ["num-bigint", "num-traits", "libquickjs-sys/patched"]
+bigint = ["num-bigint", "num-traits"]
 
 [dependencies]
 libquickjs-sys = { version = ">= 0.9.0, < 0.10.0", path = "./libquickjs-sys" }

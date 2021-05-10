@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use std::env;
 
@@ -15,9 +15,6 @@ extern crate bindgen;
 fn main() {
     #[cfg(not(feature = "bindgen"))]
     panic!("Invalid configuration for libquickjs-sys: Must either enable the bundled or the bindgen feature");
-
-    #[cfg(feature = "patched")]
-    panic!("Invalid configuration for libquickjs-sys: the patched feature is incompatible with the system feature");
 
     let lib: std::borrow::Cow<str> = if let Ok(lib) = env::var("QUICKJS_LIBRARY_PATH") {
         lib.into()

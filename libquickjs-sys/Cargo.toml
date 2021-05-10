@@ -15,7 +15,6 @@ build = "build.rs"
 
 [features]
 bundled = ["cc", "copy_dir"]
-patched = ["bundled"]
 default = ["bundled"]
 
 system = []
