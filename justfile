@@ -2,6 +2,7 @@ embed_dir := "./libquickjs-sys/embed/quickjs"
 
 DOWNLOAD_URL := "https://bellard.org/quickjs/quickjs-2020-11-08.tar.xz"
 FEATURES := "--all-features"
+QJS_TARGET := ""
 
 download-new:
     test -d {{embed_dir}} && rm -r {{embed_dir}} || echo ""
