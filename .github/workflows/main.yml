@@ -59,7 +59,6 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
 
     - name: Install libclang (windows)
-      run: choco install llvm
       run: choco install -y llvm
       if: matrix.os == 'windows-latest'
 
