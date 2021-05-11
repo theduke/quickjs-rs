@@ -11,18 +11,31 @@ on:
 
 jobs:
   test:
-    name: Test on ${{ matrix.os }} with features ${{ matrix.features }}
+    name: Test ${{ matrix.target }}
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - macOS-latest
-          - windows-latest
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: i686-unknown-linux-gnu
+          - os: macOS-latest
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: windows-latest
+            target: i686-pc-windows-msvc
+          - os: windows-latest
+            target: x86_64-pc-windows-gnu
+          - os: windows-latest
+            target: i686-pc-windows-gnu
     runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v1
+      with:
+        submodules: true
 
     - name: Install stable toolchain
       uses: actions-rs/toolchain@v1
@@ -30,17 +43,8 @@ jobs:
         profile: minimal
         toolchain: stable
         override: true
+        target: ${{ matrix.target }}
         components: rustfmt, clippy
-      if: matrix.os != 'windows-latest'
-
-    - name: Install stable toolchain (windows)
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        target: x86_64-pc-windows-gnu
-        override: true
-      if: matrix.os == 'windows-latest'
 
     - name: Install `just` command runner
       uses: extractions/setup-just@v1
@@ -54,12 +58,31 @@ jobs:
         sudo apt-get install -y curl xz-utils build-essential gcc-multilib valgrind
       if: matrix.os == 'ubuntu-latest'
 
-    - name: Setup (windows)
+    - name: Install LLVM
       run: |
-        $env:PATH = "C:\msys64\mingw64\bin;C:\msys64\usr\bin;$env:PATH"
-        echo "PATH=${env:PATH}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        echo "CARGO_BUILD_TARGET=x86_64-pc-windows-gnu" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        C:\\msys64\\usr\\bin\\bash.exe -lc "pacman --noconfirm -R mingw-w64-x86_64-clang-tools-extra mingw-w64-x86_64-clang"
+        choco install -y llvm
       if: matrix.os == 'windows-latest'
+
+    - name: Setup mingw32 gcc for i686 gnu target
+      run: |
+        C:\\msys64\\usr\\bin\\bash.exe -lc "pacman --noconfirm -S mingw32/mingw-w64-i686-gcc"
+        echo "PATH=C:\msys64\mingw32\bin;${env:PATH}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      if: matrix.target == 'i686-pc-windows-gnu'
+
+    - name: Setup mingw64 gcc for x86_64 gnu target
+      run: |
+        C:\\msys64\\usr\\bin\\bash.exe -lc "pacman --noconfirm -S mingw64/mingw-w64-x86_64-gcc"
+        echo "PATH=C:\msys64\mingw64\bin;${env:PATH}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      if: matrix.target == 'x86_64-pc-windows-gnu'
+
+    - name: Set CARGO_BUILD_TARGET
+      env:
+        QJS_TARGET: ${{ matrix.target }}
+      run: |
+        echo "CARGO_BUILD_TARGET=$QJS_TARGET" >> $GITHUB_ENV
+      shell: bash
+
 
     - name: Build (default features)
       env:
@@ -102,8 +125,8 @@ jobs:
 
     - name: Lint
       run: just lint
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.target == 'x86_64-unknown-linux-gnu'
 
     - name: Check for leaks (Valgrind)
       run: just valgrind
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.target == 'x86_64-unknown-linux-gnu'

@@ -1,4 +1,4 @@
-#include "quickjs.h"
+#include "quickjs/quickjs.h"
 
 // These are static inline functions in quickjs.h so bindgen does not pick 
 // them up.
@@ -33,12 +33,40 @@ JSValue JS_NewBool_real(JSContext *ctx, JS_BOOL val) {
     return JS_NewBool(ctx, val) ;
 }
 
+JSValue JS_NULL_real() {
+  return JS_NULL;
+}
+
+JSValue JS_UNDEFINED_real() {
+  return JS_UNDEFINED;
+}
+
+JSValue JS_EXCEPTION_real() {
+  return JS_EXCEPTION;
+}
+
+JSValue JS_MKPTR_real(int tag, void *ptr) {
+  return JS_MKPTR(tag, ptr);
+}
+
 JS_BOOL JS_VALUE_IS_NAN_real(JSValue v) {
     return JS_VALUE_IS_NAN(v);
 }
 
+int JS_VALUE_GET_INT_real(JSValue v) {
+  return (int)(JS_VALUE_GET_INT(v));
+}
+
 double JS_VALUE_GET_FLOAT64_real(JSValue v) {
     return JS_VALUE_GET_FLOAT64(v);
+}
+
+void* JS_VALUE_GET_PTR_real(JSValue v) {
+  return JS_VALUE_GET_PTR(v);
+}
+
+int JS_VALUE_GET_TAG_real(JSValue v) {
+  return JS_VALUE_GET_TAG(v);
 }
 
 int JS_VALUE_GET_NORM_TAG_real(JSValue v) {

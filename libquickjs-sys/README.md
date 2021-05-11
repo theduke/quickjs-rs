@@ -7,7 +7,7 @@ wrapper.
 
 
 *Version 0.9.0*
-**Embedded VERSION: 2020-11-08**
+**Embedded VERSION: 2021-03-27**
 
 ## Embedded vs system
 
@@ -19,16 +19,3 @@ If you want to use a version installed on your system, use:
 ```toml
 libquickjs-sys = { version = "...", default-features = false, features = ["system"] }
 ```
-
-
-## Updating the embedded bindings
-
-QuickJS sources and a pre-generated `bindings.rs` are included in the repo.
-
-They are used if the `embedded` feature is enabled.
-
-To updat the bindings, follow these steps:
-
-* (Install [just](https://github.com/casey/just))
-* Update the download URL in ./justfile
-* run `just update-quickjs`

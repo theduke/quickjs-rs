@@ -1,0 +1,3 @@
+[submodule "libquickjs-sys/src/quickjs"]
+	path = libquickjs-sys/src/quickjs
+	url = https://github.com/patr0nus/quickjs
