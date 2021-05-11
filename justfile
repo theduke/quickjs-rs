@@ -8,14 +8,14 @@ build:
     rustc --version
     cargo --version
 
-    cargo build --verbose {{FEATURES}}
+    cargo build --release --verbose {{FEATURES}}
 
 test:
     rustc --version
     cargo --version
 
     # Limit test threads to 1 to show test name before execution.
-    RUST_TEST_THREADS=1 cargo test --verbose {{FEATURES}}
+    RUST_TEST_THREADS=1 cargo test --release --verbose {{FEATURES}}
 
 lint:
     rustc --version
@@ -32,4 +32,4 @@ lint:
 
 valgrind:
     echo "Checking for memory leaks..."
-    find target/{{env_var_or_default("CARGO_BUILD_TARGET", "")}}/debug/deps -maxdepth 1 -type f -executable | xargs valgrind --leak-check=full --error-exitcode=1
+    find target/{{env_var_or_default("CARGO_BUILD_TARGET", "")}}/release/deps -maxdepth 1 -type f -executable | xargs valgrind --leak-check=full --error-exitcode=1
