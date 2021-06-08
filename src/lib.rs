@@ -5,7 +5,7 @@
 //!
 //! ## Limitations
 //!
-//! * Windows is not supported yet
+//! * Building on Windows requires the `x86_64-pc-windows-gnu` toolchain
 //!
 //! ## Quickstart:
 //!
