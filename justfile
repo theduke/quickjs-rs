@@ -29,7 +29,7 @@ build:
     rustc --version
     cargo --version
 
-    RUSTFLAGS="-D warnings" cargo build --verbose {{FEATURES}}
+    cargo build --verbose {{FEATURES}}
 
 test:
     rustc --version
