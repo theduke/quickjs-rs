@@ -1,5 +1,11 @@
 # libquickjs_sys - Changelog
 
+
+## v0.10.0 - 2021-08-09
+
+* Upgraded to quickjs version `2021-03-27`
+* Added `JS_ValueGetTag`
+
 ## v0.9.0 - 2021-02-04
 
 * Upgraded to quickjs version `2020-11-08`
