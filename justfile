@@ -55,5 +55,5 @@ valgrind:
     echo "Checking for memory leaks..."
     cargo clean
     cargo build --tests --all-features
-    find target/debug/deps -maxdepth 1 -type f -executable | xargs valgrind --leak-check=full --error-exitcode=1 --gen-suppressions=yes
+    find target/debug/deps -maxdepth 1 -type f -executable | xargs valgrind --leak-check=full --error-exitcode=1 --gen-suppressions=yes --show-error-list=yes
 
