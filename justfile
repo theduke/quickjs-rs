@@ -29,7 +29,7 @@ build:
     rustc --version
     cargo --version
 
-    cargo build --verbose {{FEATURES}}
+    RUSTFLAGS="-D warnings" cargo build --verbose {{FEATURES}}
 
 test:
     rustc --version
@@ -53,4 +53,7 @@ lint:
 
 valgrind:
     echo "Checking for memory leaks..."
-    find target/debug/deps -maxdepth 1 -type f -executable | xargs valgrind --leak-check=full --error-exitcode=1
+    cargo clean
+    cargo build --tests
+    find target/debug/deps -maxdepth 1 -type f -executable | xargs valgrind --leak-check=full --error-exitcode=1 --gen-suppressions=yes
+
