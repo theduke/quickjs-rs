@@ -17,9 +17,6 @@ use crate::{
     ContextError, ExecutionError, JsValue, ValueError,
 };
 
-#[cfg(feature = "bigint")]
-use crate::value::{bigint::BigIntOrI64, BigInt};
-
 use value::{JsFunction, OwnedJsObject};
 
 pub use value::{JsCompiledFunction, OwnedJsValue};
