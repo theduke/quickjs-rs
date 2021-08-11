@@ -299,6 +299,8 @@ impl fmt::Display for ValueError {
 
 impl error::Error for ValueError {}
 
+mod serde;
+
 #[cfg(test)]
 mod tests {
     #[allow(unused_imports)]
