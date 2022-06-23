@@ -622,3 +622,9 @@ fn test_global_setter() {
     ctx.set_global("a", "a").unwrap();
     ctx.eval("a + 1").unwrap();
 }
+
+#[test]
+fn test_async_fn_returning_undefined() {
+    let ctx = Context::new().unwrap();
+    ctx.eval("(async () => undefined)()").unwrap();
+}

@@ -572,7 +572,15 @@ impl ContextWrapper {
                     let res_val = global.property_require("__promiseResult")?;
                     if res_val.is_bool() {
                         let ok = res_val.to_bool()?;
-                        let value = global.property_require("__promiseValue")?;
+                        let value = global.property("__promiseValue")?.unwrap_or_else(|| {
+                            OwnedJsValue::new(
+                                self,
+                                q::JSValue {
+                                    u: q::JSValueUnion { int32: 0 },
+                                    tag: TAG_UNDEFINED,
+                                },
+                            )
+                        });
 
                         if ok {
                             return self.resolve_value(value);
