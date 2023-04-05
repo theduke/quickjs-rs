@@ -6,7 +6,7 @@ mod value;
 use std::{
     ffi::CString,
     os::raw::{c_int, c_void},
-    sync::Mutex,
+    sync::Mutex, panic::RefUnwindSafe,
 };
 
 use libquickjs_sys as q;
@@ -81,6 +81,30 @@ where
     });
 
     ((boxed_f, data), Some(trampoline::<F>))
+}
+
+type InterruptHandlerWrapper = dyn Fn(*mut q::JSRuntime) -> i32;
+fn interrupt_handler_trampoline<F>(
+    closure: F,
+) -> ((Box<InterruptHandlerWrapper>, *mut c_void), unsafe extern "C" fn(*mut q::JSRuntime, *mut c_void) -> i32)
+where
+    F: Fn(*mut q::JSRuntime) -> i32 + 'static,
+{
+    unsafe extern "C" fn trampoline<F>(
+        rt: *mut q::JSRuntime,
+        closure_ptr: *mut c_void
+    ) -> i32
+    where
+        F: Fn(*mut q::JSRuntime) -> i32 + 'static,
+    {
+        let closure: &mut F = &mut *(closure_ptr as *mut F);
+        (*closure)(rt)
+    }
+
+    let boxed_f = Box::new(closure);
+    let data_ptr = (&*boxed_f) as *const F as *mut c_void;
+
+    ((boxed_f, data_ptr), trampoline::<F>)
 }
 
 /// OwnedValueRef wraps a Javascript value from the quickjs runtime.
@@ -340,6 +364,7 @@ pub struct ContextWrapper {
     /// the closure.
     // A Mutex is used over a RefCell because it needs to be unwind-safe.
     callbacks: Mutex<Vec<(Box<WrappedCallback>, Box<q::JSValue>)>>,
+    interrupt_handler: Mutex<Option<Box<InterruptHandlerWrapper>>>
 }
 
 impl Drop for ContextWrapper {
@@ -380,6 +405,7 @@ impl ContextWrapper {
             runtime,
             context,
             callbacks: Mutex::new(Vec::new()),
+            interrupt_handler: Mutex::new(None)
         };
 
         Ok(wrapper)
@@ -501,7 +527,7 @@ impl ContextWrapper {
     }
 
     /// Returns `Result::Err` when an error ocurred.
-    pub(crate) fn ensure_no_excpetion(&self) -> Result<(), ExecutionError> {
+    pub(crate) fn ensure_no_exception(&self) -> Result<(), ExecutionError> {
         if let Some(e) = self.get_exception() {
             Err(e)
         } else {
@@ -733,5 +759,20 @@ impl ContextWrapper {
         let global = self.global()?;
         global.set_property(name, cfunc.into_value())?;
         Ok(())
+    }
+
+    pub fn set_interrupt_handler<'a, F: Fn() -> bool + 'static + RefUnwindSafe>(&'a self, handler: F) {
+        let wrapper = move |_rt: *mut q::JSRuntime| {
+            let result = std::panic::catch_unwind(|| handler());
+            match result {
+                Ok(false) => 0,
+                _ => 1
+            }
+        };
+        let pair = interrupt_handler_trampoline(wrapper);
+        *self.interrupt_handler.lock().unwrap() = Some(pair.0.0);
+        unsafe {
+            q::JS_SetInterruptHandler(self.runtime, Some(pair.1), pair.0.1)
+        };
     }
 }

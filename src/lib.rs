@@ -42,7 +42,7 @@ mod value;
 #[cfg(test)]
 mod tests;
 
-use std::{convert::TryFrom, error, fmt};
+use std::{convert::TryFrom, error, fmt, panic::RefUnwindSafe};
 
 pub use self::{
     callback::{Arguments, Callback},
@@ -355,7 +355,7 @@ impl Context {
     /// use quick_js::{Context, JsValue};
     /// let context = Context::new().unwrap();
     ///
-    /// // Register a closue as a callback under the "add" name.
+    /// // Register a closure as a callback under the "add" name.
     /// // The 'add' function can now be called from Javascript code.
     /// context.add_callback("add", |a: i32, b: i32| { a + b }).unwrap();
     ///
@@ -372,5 +372,12 @@ impl Context {
         callback: impl Callback<F> + 'static,
     ) -> Result<(), ExecutionError> {
         self.wrapper.add_callback(name, callback)
+    }
+
+    /// Set an interrupt handler callback.
+    /// This is "regularly called by the engine when it is executing code".
+    /// This must return a `bool`. If its value is `true`, or the handler function panics, JS execution halts.
+    pub fn set_interrupt_handler<F: Fn() -> bool + 'static + RefUnwindSafe>(&self, handler: F) {
+        self.wrapper.set_interrupt_handler(handler);
     }
 }
