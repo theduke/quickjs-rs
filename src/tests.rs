@@ -622,3 +622,17 @@ fn test_global_setter() {
     ctx.set_global("a", "a").unwrap();
     ctx.eval("a + 1").unwrap();
 }
+
+// test interrupt handler, ensuring that closure data works
+#[test]
+fn test_interrupt_handler() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let ctx = Context::new().unwrap();
+    let arg = AtomicUsize::new(0);
+    ctx.set_interrupt_handler(move || {
+        let counter = arg.fetch_add(1, Ordering::Relaxed);
+        println!("{}", counter);
+        counter == 10
+    });
+    assert_eq!(ctx.eval("while (1) {}"), Err(ExecutionError::Exception(JsValue::String("InternalError: interrupted".to_string()))));
+}

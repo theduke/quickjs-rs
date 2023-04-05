@@ -28,7 +28,7 @@ pub fn compile<'a>(
     };
 
     // check for error
-    context.ensure_no_excpetion()?;
+    context.ensure_no_exception()?;
     Ok(value)
 }
 
@@ -45,7 +45,7 @@ pub fn run_compiled_function<'a>(
         OwnedJsValue::new(context, v)
     };
 
-    context.ensure_no_excpetion().map_err(|e| {
+    context.ensure_no_exception().map_err(|e| {
         if let ExecutionError::Internal(msg) = e {
             ExecutionError::Internal(format!("Could not evaluate compiled function: {}", msg))
         } else {
