@@ -1,8 +1,9 @@
 use std::ffi::{CStr, CString};
 
 use libquickjs_sys::{
-    size_t, JSContext, JSValue, JS_IsException, JS_NewBigInt64, JS_NewBigUint64, JS_NewBool,
-    JS_NewFloat64, JS_NewInt32, JS_NewStringLen,
+    size_t, JSContext, JSValue, JS_AtomToValue, JS_DupAtom, JS_DupValue, JS_IsException,
+    JS_NewArrayBufferCopy, JS_NewAtom, JS_NewBigInt64, JS_NewBigUint64, JS_NewBool, JS_NewFloat64,
+    JS_NewInt32, JS_NewStringLen, JS_ATOM_NULL,
 };
 use serde::Serialize;
 
@@ -111,11 +112,17 @@ impl<'a> serde::Serializer for Serializer<'a> {
     }
 
     fn serialize_bytes(self, value: &[u8]) -> Result<Self::Ok, Self::Error> {
-        todo!()
+        // TODO: in theory we could also use `JS_NewArrayBuffer` here, but that would be
+        // _a lot_ more complicated.
+        let length = value.len();
+
+        let value =
+            unsafe { JS_NewArrayBufferCopy(self.context, value.as_ptr(), length as size_t) };
+        SerializationError::try_from_value(self.context, value)
     }
 
     fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
-        todo!()
+        self.serialize_unit()
     }
 
     fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
@@ -126,44 +133,56 @@ impl<'a> serde::Serializer for Serializer<'a> {
     }
 
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
-        todo!()
+        // Unit corresponds to `null` in JS
+
+        // TODO: I have no idea if this is correct (AtomToValue)
+        let value = unsafe { JS_AtomToValue(self.context, JS_ATOM_NULL) };
+        SerializationError::try_from_value(self.context, value)
     }
 
-    fn serialize_unit_struct(self, name: &'static str) -> Result<Self::Ok, Self::Error> {
-        todo!()
+    fn serialize_unit_struct(self, _: &'static str) -> Result<Self::Ok, Self::Error> {
+        self.serialize_unit()
     }
 
     fn serialize_unit_variant(
         self,
-        name: &'static str,
-        variant_index: u32,
+        _: &'static str,
+        _: u32,
         variant: &'static str,
     ) -> Result<Self::Ok, Self::Error> {
-        todo!()
+        // We follow the same approach as serde_json here, and serialize the variant as
+        // a string.
+        self.serialize_str(variant)
     }
 
     fn serialize_newtype_struct<T: ?Sized>(
         self,
-        name: &'static str,
+        _: &'static str,
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
         T: Serialize,
     {
-        todo!()
+        T::serialize(value, self)
     }
 
     fn serialize_newtype_variant<T: ?Sized>(
         self,
-        name: &'static str,
-        variant_index: u32,
+        _: &'static str,
+        _: u32,
         variant: &'static str,
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
         T: Serialize,
     {
-        todo!()
+        // We follow the same approach as serde_json here, and serialize the variant as,
+        // we serialize the value as an object with a single field.
+        // { `variant`: `value` }
+
+        let mut serializer = self.serialize_map(Some(1))?;
+        serializer.serialize_entry(variant, value)?;
+        serializer.end()
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
