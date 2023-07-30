@@ -1,10 +1,12 @@
+use std::ffi::{CStr, CString};
+
 use libquickjs_sys::{
-    JSContext, JSValue, JS_IsException, JS_NewBigInt64, JS_NewBigUint64, JS_NewBool, JS_NewFloat64,
-    JS_NewInt32,
+    size_t, JSContext, JSValue, JS_IsException, JS_NewBigInt64, JS_NewBigUint64, JS_NewBool,
+    JS_NewFloat64, JS_NewInt32, JS_NewStringLen,
 };
 use serde::Serialize;
 
-use crate::errors::SerializationError;
+use crate::errors::{Internal, SerializationError};
 
 pub struct Serializer<'a> {
     context: &'a mut JSContext,
@@ -95,11 +97,17 @@ impl<'a> serde::Serializer for Serializer<'a> {
     }
 
     fn serialize_char(self, value: char) -> Result<Self::Ok, Self::Error> {
-        todo!()
+        let mut buffer = [0; 4];
+        let string = value.encode_utf8(&mut buffer);
+
+        self.serialize_str(string)
     }
 
     fn serialize_str(self, value: &str) -> Result<Self::Ok, Self::Error> {
-        todo!()
+        let c_str = CString::new(value).map_err(Internal::from)?;
+
+        let value = unsafe { JS_NewStringLen(self.context, c_str.as_ptr(), value.len() as size_t) };
+        SerializationError::try_from_value(self.context, value)
     }
 
     fn serialize_bytes(self, value: &[u8]) -> Result<Self::Ok, Self::Error> {

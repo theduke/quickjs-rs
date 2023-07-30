@@ -7,7 +7,7 @@ use libquickjs_sys::{
 };
 use thiserror::Error;
 
-#[derive(Debug, Clone, Copy, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum Internal {
     #[error("Unexpected null pointer")]
     UnexpectedNullPointer,
@@ -17,6 +17,8 @@ pub enum Internal {
     ExpectedString,
     #[error("Invalid UTF-8")]
     InvalidUtf8(#[from] Utf8Error),
+    #[error("Nul byte found in string")]
+    NulError(#[from] std::ffi::NulError),
 }
 
 unsafe fn get_string(context: &mut JSContext, value: JSValue) -> Result<String, Internal> {
