@@ -9,3 +9,4 @@ edition = "2021"
 libquickjs-sys = { path = "../libquickjs-sys" }
 
 serde = "1"
+thiserror = "1"
