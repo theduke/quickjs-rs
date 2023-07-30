@@ -1,6 +1,4 @@
-use std::error::Error;
 use std::ffi::CStr;
-use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
 
 use libquickjs_sys::{

@@ -1,6 +1,8 @@
+use std::mem;
+
 use libquickjs_sys::{
-    JSAtom, JSContext, JSValue, JS_FreeAtom, JS_FreeValue, JS_GetException, JS_IsNull,
-    JS_NewObject, JS_SetProperty, JS_ValueToAtom, JS_ATOM_NULL,
+    JSAtom, JSValue, JS_FreeAtom, JS_FreeValue, JS_NewObject, JS_SetProperty, JS_ValueToAtom,
+    JS_ATOM_NULL,
 };
 use serde::Serialize;
 
@@ -24,6 +26,9 @@ impl<'a> SerializeMap<'a> {
         Ok(Self {
             context,
             object: Some(object),
+
+            pending_key: None,
+            buffer: Vec::new(),
         })
     }
 
@@ -71,9 +76,19 @@ impl<'a> SerializeMap<'a> {
             return Err(SerializationError::MissingValue);
         }
 
-        // insert the buffered values
-        for (key, value) in self.buffer.drain(..) {
-            self.insert(key, value)?;
+        let mut buffer = mem::take(&mut self.buffer);
+        buffer.reverse();
+
+        while let Some((key, value)) = buffer.pop() {
+            if let Err(error) = self.insert(key, value) {
+                // free the remaining values
+                for (key, value) in buffer {
+                    unsafe { JS_FreeValue(self.context.as_mut_ptr(), key) };
+                    unsafe { JS_FreeValue(self.context.as_mut_ptr(), value) };
+                }
+
+                return Err(error);
+            }
         }
 
         self.object.take().ok_or(SerializationError::InvalidState)

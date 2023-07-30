@@ -5,17 +5,17 @@ mod variant;
 use std::ffi::CString;
 
 use libquickjs_sys::{
-    size_t, JSValue, JS_AtomToValue, JS_IsException, JS_NewArrayBufferCopy, JS_NewAtom,
-    JS_NewBigInt64, JS_NewBigUint64, JS_NewBool, JS_NewFloat64, JS_NewInt32, JS_NewStringLen,
-    JS_ATOM_NULL,
+    size_t, JSValue, JS_AtomToValue, JS_NewArrayBufferCopy, JS_NewBigInt64, JS_NewBigUint64,
+    JS_NewBool, JS_NewFloat64, JS_NewInt32, JS_NewStringLen, JS_ATOM_NULL,
 };
-use serde::ser::{SerializeMap as _, SerializeTuple as _};
+use serde::ser::SerializeMap as _;
 use serde::Serialize;
 
 use crate::context::Context;
 use crate::errors::{Internal, SerializationError};
 use crate::ser::map::SerializeMap;
 use crate::ser::seq::SerializeSeq;
+use crate::ser::variant::{SerializeStructVariant, SerializeTupleVariant};
 
 pub struct Serializer<'a> {
     context: &'a mut Context,
@@ -33,12 +33,12 @@ impl<'a> serde::Serializer for Serializer<'a> {
     type SerializeMap = SerializeMap<'a>;
     type SerializeSeq = SerializeSeq<'a>;
     type SerializeStruct = SerializeMap<'a>;
-    type SerializeStructVariant = ();
+    type SerializeStructVariant = SerializeStructVariant<'a>;
     type SerializeTuple = SerializeSeq<'a>;
     type SerializeTupleStruct = SerializeSeq<'a>;
-    type SerializeTupleVariant = ();
+    type SerializeTupleVariant = SerializeTupleVariant<'a>;
 
-    fn serialize_bool(mut self, value: bool) -> Result<Self::Ok, Self::Error> {
+    fn serialize_bool(self, value: bool) -> Result<Self::Ok, Self::Error> {
         let value = unsafe { JS_NewBool(self.context.as_mut_ptr(), value) };
         SerializationError::try_from_value(self.context.as_mut_ptr(), value)
     }
@@ -51,12 +51,12 @@ impl<'a> serde::Serializer for Serializer<'a> {
         self.serialize_i32(i32::from(value))
     }
 
-    fn serialize_i32(mut self, value: i32) -> Result<Self::Ok, Self::Error> {
+    fn serialize_i32(self, value: i32) -> Result<Self::Ok, Self::Error> {
         let value = unsafe { JS_NewInt32(self.context.as_mut_ptr(), value) };
         SerializationError::try_from_value(self.context.as_mut_ptr(), value)
     }
 
-    fn serialize_i64(mut self, value: i64) -> Result<Self::Ok, Self::Error> {
+    fn serialize_i64(self, value: i64) -> Result<Self::Ok, Self::Error> {
         // try to fit the value into a 32-bit integer, otherwise return a BigInt
         if let Ok(value) = i32::try_from(value) {
             return self.serialize_i32(value);
@@ -85,7 +85,7 @@ impl<'a> serde::Serializer for Serializer<'a> {
         self.serialize_u64(u64::from(value))
     }
 
-    fn serialize_u64(mut self, value: u64) -> Result<Self::Ok, Self::Error> {
+    fn serialize_u64(self, value: u64) -> Result<Self::Ok, Self::Error> {
         // try to fit the value into a 32-bit integer, otherwise return a BigInt
         // we could also call `serialize_u64` instead, but that is largely redundant.
         if let Ok(value) = i32::try_from(value) {
@@ -100,7 +100,7 @@ impl<'a> serde::Serializer for Serializer<'a> {
         self.serialize_f64(f64::from(value))
     }
 
-    fn serialize_f64(mut self, value: f64) -> Result<Self::Ok, Self::Error> {
+    fn serialize_f64(self, value: f64) -> Result<Self::Ok, Self::Error> {
         let value = unsafe { JS_NewFloat64(self.context.as_mut_ptr(), value) };
         SerializationError::try_from_value(self.context.as_mut_ptr(), value)
     }
@@ -144,7 +144,7 @@ impl<'a> serde::Serializer for Serializer<'a> {
     where
         T: Serialize,
     {
-        todo!()
+        value.serialize(self)
     }
 
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
@@ -201,11 +201,11 @@ impl<'a> serde::Serializer for Serializer<'a> {
     }
 
     fn serialize_seq(self, _: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-        Ok(SerializeSeq::new(self.context))
+        SerializeSeq::new(self.context)
     }
 
     fn serialize_tuple(self, _: usize) -> Result<Self::SerializeTuple, Self::Error> {
-        Ok(SerializeSeq::new(self.context))
+        SerializeSeq::new(self.context)
     }
 
     fn serialize_tuple_struct(
@@ -213,39 +213,39 @@ impl<'a> serde::Serializer for Serializer<'a> {
         _: &'static str,
         _: usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
-        Ok(SerializeSeq::new(self.context))
+        SerializeSeq::new(self.context)
     }
 
     fn serialize_tuple_variant(
         self,
-        name: &'static str,
-        variant_index: u32,
+        _: &'static str,
+        _: u32,
         variant: &'static str,
-        len: usize,
+        _: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-        todo!()
+        SerializeTupleVariant::new(variant, self.context)
     }
 
     fn serialize_map(self, _: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
-        Ok(SerializeMap::new(self.context))
+        SerializeMap::new(self.context)
     }
 
     fn serialize_struct(
         self,
-        name: &'static str,
-        len: usize,
+        _: &'static str,
+        _: usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
-        Ok(SerializeMap::new(self.context))
+        SerializeMap::new(self.context)
     }
 
     fn serialize_struct_variant(
         self,
-        name: &'static str,
-        variant_index: u32,
+        _: &'static str,
+        _: u32,
         variant: &'static str,
-        len: usize,
+        _: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        todo!()
+        SerializeStructVariant::new(variant, self.context)
     }
 
     fn is_human_readable(&self) -> bool {

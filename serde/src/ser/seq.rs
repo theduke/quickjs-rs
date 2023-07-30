@@ -6,7 +6,7 @@ use crate::errors::SerializationError;
 use crate::ser::Serializer;
 
 pub struct SerializeSeq<'a> {
-    context: &'a mut Context,
+    pub(crate) context: &'a mut Context,
 
     count: u32,
     array: Option<JSValue>,

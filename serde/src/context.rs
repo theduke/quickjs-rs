@@ -9,10 +9,6 @@ impl Context {
         Self { context }
     }
 
-    pub(crate) fn as_ptr(&self) -> *const JSContext {
-        self.context
-    }
-
     pub(crate) fn as_mut_ptr(&mut self) -> *mut JSContext {
         self.context as *mut _
     }
