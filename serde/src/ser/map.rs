@@ -15,7 +15,6 @@ pub struct SerializeMap<'a> {
     object: Option<JSValue>,
 
     pending_key: Option<JSValue>,
-    buffer: Vec<(JSValue, JSValue)>,
 }
 
 impl<'a> SerializeMap<'a> {
@@ -28,7 +27,6 @@ impl<'a> SerializeMap<'a> {
             object: Some(object),
 
             pending_key: None,
-            buffer: Vec::new(),
         })
     }
 
@@ -76,21 +74,6 @@ impl<'a> SerializeMap<'a> {
             return Err(SerializationError::MissingValue);
         }
 
-        let mut buffer = mem::take(&mut self.buffer);
-        buffer.reverse();
-
-        while let Some((key, value)) = buffer.pop() {
-            if let Err(error) = self.insert(key, value) {
-                // free the remaining values
-                for (key, value) in buffer {
-                    unsafe { JS_FreeValue(self.context.as_mut_ptr(), key) };
-                    unsafe { JS_FreeValue(self.context.as_mut_ptr(), value) };
-                }
-
-                return Err(error);
-            }
-        }
-
         self.object.take().ok_or(SerializationError::InvalidState)
     }
 }
@@ -122,7 +105,7 @@ impl<'a> serde::ser::SerializeMap for SerializeMap<'a> {
         let serializer = Serializer::new(self.context);
         let value = value.serialize(serializer)?;
 
-        self.buffer.push((key, value));
+        self.insert(key, value)?;
         Ok(())
     }
 
@@ -144,7 +127,17 @@ impl<'a> serde::ser::SerializeMap for SerializeMap<'a> {
 
         let value = {
             let serializer = Serializer::new(self.context);
-            value.serialize(serializer)?
+            value.serialize(serializer)
+        };
+
+        let value = match value {
+            Ok(value) => value,
+            Err(error) => {
+                // free the key
+                unsafe { JS_FreeValue(self.context.as_mut_ptr(), key) };
+
+                return Err(error);
+            }
         };
 
         self.insert(key, value)
@@ -185,12 +178,6 @@ impl Drop for SerializeMap<'_> {
         // free the pending key
         if let Some(key) = self.pending_key.take() {
             unsafe { JS_FreeValue(self.context.as_mut_ptr(), key) };
-        }
-
-        // free the buffer
-        for (key, value) in self.buffer.drain(..) {
-            unsafe { JS_FreeValue(self.context.as_mut_ptr(), key) };
-            unsafe { JS_FreeValue(self.context.as_mut_ptr(), value) };
         }
     }
 }
