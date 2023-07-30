@@ -44,7 +44,7 @@ unsafe fn get_string(context: &mut JSContext, value: JSValue) -> Result<String, 
 }
 
 unsafe fn exception_to_string(
-    context: &mut JSContext,
+    context: *mut JSContext,
     exception: JSValue,
 ) -> Result<String, Internal> {
     if JS_IsNull(exception) {
@@ -71,7 +71,7 @@ pub enum SerializationError {
 }
 
 impl SerializationError {
-    pub fn try_from_value(context: &mut JSContext, value: JSValue) -> Result<JSValue, Self> {
+    pub fn try_from_value(context: *mut JSContext, value: JSValue) -> Result<JSValue, Self> {
         if unsafe { JS_IsException(value) } {
             // we're for sure an error, we just don't know which one
             // TODO: do we need to free here?

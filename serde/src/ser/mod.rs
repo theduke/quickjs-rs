@@ -1,7 +1,9 @@
+mod map;
+
 use std::ffi::{CStr, CString};
 
 use libquickjs_sys::{
-    size_t, JSContext, JSValue, JS_AtomToValue, JS_DupAtom, JS_DupValue, JS_IsException,
+    size_t, JSContext, JSValue, JS_AtomToValue, JS_DupValue, JS_FreeContext, JS_IsException,
     JS_NewArrayBufferCopy, JS_NewAtom, JS_NewBigInt64, JS_NewBigUint64, JS_NewBool, JS_NewFloat64,
     JS_NewInt32, JS_NewStringLen, JS_ATOM_NULL,
 };
@@ -9,17 +11,23 @@ use serde::Serialize;
 
 use crate::errors::{Internal, SerializationError};
 
-pub struct Serializer<'a> {
-    context: &'a mut JSContext,
+pub struct Serializer {
+    context: *mut JSContext,
 }
 
-impl<'a> Serializer<'a> {
-    pub fn new(context: &'a mut JSContext) -> Self {
+impl Serializer {
+    pub fn new(context: *mut JSContext) -> Self {
         Self { context }
     }
 }
 
-impl<'a> serde::Serializer for Serializer<'a> {
+impl Drop for Serializer {
+    fn drop(&mut self) {
+        unsafe { JS_FreeContext(self.context) };
+    }
+}
+
+impl serde::Serializer for Serializer {
     type Error = SerializationError;
     type Ok = JSValue;
     type SerializeMap = ();
