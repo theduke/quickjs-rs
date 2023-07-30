@@ -1,4 +1,6 @@
+use std::error::Error;
 use std::ffi::CStr;
+use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
 
 use libquickjs_sys::{
@@ -21,7 +23,7 @@ pub enum Internal {
     NulError(#[from] std::ffi::NulError),
 }
 
-unsafe fn get_string(context: &mut JSContext, value: JSValue) -> Result<String, Internal> {
+unsafe fn get_string(context: *mut JSContext, value: JSValue) -> Result<String, Internal> {
     if !JS_IsString(value) {
         return Err(Internal::ExpectedString);
     }
@@ -43,7 +45,7 @@ unsafe fn get_string(context: &mut JSContext, value: JSValue) -> Result<String, 
     Ok(string)
 }
 
-unsafe fn exception_to_string(
+pub(crate) unsafe fn exception_to_string(
     context: *mut JSContext,
     exception: JSValue,
 ) -> Result<String, Internal> {
@@ -68,27 +70,46 @@ pub enum SerializationError {
     Internal(#[from] Internal),
     #[error("Unknown error: {0}")]
     Unknown(String),
+    #[error("Expected call to `serialize_key` before `serialize_value`")]
+    MissingKey,
+    #[error("Expected either a string or a number as a key")]
+    InvalidKey,
 }
 
 impl SerializationError {
+    pub fn from_exception(context: *mut JSContext) -> Self {
+        // https://bellard.org/quickjs/quickjs.html#Exceptions 3.4.4
+        let exception = unsafe { JS_GetException(context) };
+
+        let value = unsafe { exception_to_string(context, exception) };
+
+        match value {
+            Ok(value) => {
+                if value.contains("out of memory") {
+                    Self::OutOfMemory
+                } else {
+                    Self::Unknown(value)
+                }
+            }
+            Err(err) => err.into(),
+        }
+    }
+
     pub fn try_from_value(context: *mut JSContext, value: JSValue) -> Result<JSValue, Self> {
         if unsafe { JS_IsException(value) } {
             // we're for sure an error, we just don't know which one
             // TODO: do we need to free here?
             unsafe { JS_FreeValue(context, value) }
 
-            // https://bellard.org/quickjs/quickjs.html#Exceptions 3.4.4
-            let exception = unsafe { JS_GetException(context) };
-
-            let value = unsafe { exception_to_string(context, exception) }?;
-
-            if value.contains("out of memory") {
-                return Err(Self::OutOfMemory);
-            }
-
-            Err(Self::Unknown(value))
+            Err(Self::from_exception(context))
         } else {
             Ok(value)
         }
+    }
+}
+
+impl serde::ser::Error for SerializationError {
+    fn custom<T: std::fmt::Display>(msg: T) -> Self {
+        Self::Unknown(msg.to_string())
     }
 }
