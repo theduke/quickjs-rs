@@ -14,10 +14,13 @@ pub struct SerializeStructVariant<'a> {
 }
 
 impl<'a> SerializeStructVariant<'a> {
-    pub fn new(variant: &'static str, context: &'a mut Context) -> Self {
-        let inner = SerializeMap::new(context);
+    pub fn new(
+        variant: &'static str,
+        context: &'a mut Context,
+    ) -> Result<Self, SerializationError> {
+        let inner = SerializeMap::new(context)?;
 
-        Self { variant, inner }
+        Ok(Self { variant, inner })
     }
 }
 
