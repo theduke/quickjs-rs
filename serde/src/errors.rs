@@ -45,7 +45,7 @@ unsafe fn get_string(context: *mut JSContext, value: JSValue) -> Result<String, 
     Ok(string)
 }
 
-pub(crate) unsafe fn exception_to_string(
+unsafe fn exception_to_string(
     context: *mut JSContext,
     exception: JSValue,
 ) -> Result<String, Internal> {
@@ -72,6 +72,8 @@ pub enum SerializationError {
     Unknown(String),
     #[error("Expected call to `serialize_key` before `serialize_value`")]
     MissingKey,
+    #[error("Expected call times of calls to `serialize_key` and `serialize_value` to be equal")]
+    MissingValue,
     #[error("Expected either a string or a number as a key")]
     InvalidKey,
 }

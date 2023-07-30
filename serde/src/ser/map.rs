@@ -5,7 +5,7 @@ use libquickjs_sys::{
 use serde::Serialize;
 
 use crate::context::Context;
-use crate::errors::{exception_to_string, SerializationError};
+use crate::errors::SerializationError;
 use crate::ser::Serializer;
 
 pub struct SerializeMap<'a> {
@@ -110,10 +110,21 @@ impl<'a> serde::ser::SerializeMap for SerializeMap<'a> {
             let serializer = Serializer::new(self.context);
             value.serialize(serializer)?
         };
+
+        self.insert(key, value)
     }
 
-    fn end(self) -> Result<Self::Ok, Self::Error> {
-        todo!()
+    fn end(mut self) -> Result<Self::Ok, Self::Error> {
+        if self.pending_key.is_some() {
+            return Err(SerializationError::MissingValue);
+        }
+
+        // insert the buffered values
+        for (key, value) in self.buffer {
+            self.insert(key, value)?;
+        }
+
+        Ok(self.object)
     }
 }
 
