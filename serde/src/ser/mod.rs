@@ -8,7 +8,7 @@ use libquickjs_sys::{
     JS_NewBigInt64, JS_NewBigUint64, JS_NewBool, JS_NewFloat64, JS_NewInt32, JS_NewStringLen,
     JS_ATOM_NULL,
 };
-use serde::ser::SerializeMap as _;
+use serde::ser::{SerializeMap as _, SerializeTuple as _};
 use serde::Serialize;
 
 use crate::context::Context;
@@ -33,8 +33,8 @@ impl<'a> serde::Serializer for Serializer<'a> {
     type SerializeSeq = SerializeSeq<'a>;
     type SerializeStruct = SerializeMap<'a>;
     type SerializeStructVariant = ();
-    type SerializeTuple = ();
-    type SerializeTupleStruct = ();
+    type SerializeTuple = SerializeSeq<'a>;
+    type SerializeTupleStruct = SerializeSeq<'a>;
     type SerializeTupleVariant = ();
 
     fn serialize_bool(mut self, value: bool) -> Result<Self::Ok, Self::Error> {
@@ -203,16 +203,16 @@ impl<'a> serde::Serializer for Serializer<'a> {
         Ok(SerializeSeq::new(self.context))
     }
 
-    fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
-        todo!()
+    fn serialize_tuple(self, _: usize) -> Result<Self::SerializeTuple, Self::Error> {
+        Ok(SerializeSeq::new(self.context))
     }
 
     fn serialize_tuple_struct(
         self,
-        name: &'static str,
-        len: usize,
+        _: &'static str,
+        _: usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
-        todo!()
+        Ok(SerializeSeq::new(self.context))
     }
 
     fn serialize_tuple_variant(

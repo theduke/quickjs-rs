@@ -61,6 +61,38 @@ impl<'a> serde::ser::SerializeSeq for SerializeSeq<'a> {
     }
 }
 
+impl<'a> serde::ser::SerializeTuple for SerializeSeq<'a> {
+    type Error = SerializationError;
+    type Ok = JSValue;
+
+    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    where
+        T: Serialize,
+    {
+        <Self as serde::ser::SerializeSeq>::serialize_element(self, value)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        <Self as serde::ser::SerializeSeq>::end(self)
+    }
+}
+
+impl<'a> serde::ser::SerializeTupleStruct for SerializeSeq<'a> {
+    type Error = SerializationError;
+    type Ok = JSValue;
+
+    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    where
+        T: Serialize,
+    {
+        <Self as serde::ser::SerializeSeq>::serialize_element(self, value)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        <Self as serde::ser::SerializeSeq>::end(self)
+    }
+}
+
 impl Drop for SerializeSeq<'_> {
     fn drop(&mut self) {
         if let Some(array) = self.array.take() {
