@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 libquickjs-sys = { path = "../libquickjs-sys" }
+
+serde = "1"
