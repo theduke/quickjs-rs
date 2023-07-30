@@ -4,6 +4,8 @@ use libquickjs_sys::{
 };
 use serde::Serialize;
 
+use crate::errors::SerializationError;
+
 pub struct Serializer<'a> {
     context: &'a mut JSContext,
 }
@@ -15,7 +17,7 @@ impl<'a> Serializer<'a> {
 }
 
 impl<'a> serde::Serializer for Serializer<'a> {
-    type Error = ();
+    type Error = SerializationError;
     type Ok = JSValue;
     type SerializeMap = ();
     type SerializeSeq = ();
@@ -27,8 +29,7 @@ impl<'a> serde::Serializer for Serializer<'a> {
 
     fn serialize_bool(self, value: bool) -> Result<Self::Ok, Self::Error> {
         let value = unsafe { JS_NewBool(self.context, value) };
-
-        Ok(value)
+        SerializationError::try_from_value(self.context, value)
     }
 
     fn serialize_i8(self, value: i8) -> Result<Self::Ok, Self::Error> {
@@ -41,8 +42,7 @@ impl<'a> serde::Serializer for Serializer<'a> {
 
     fn serialize_i32(self, value: i32) -> Result<Self::Ok, Self::Error> {
         let value = unsafe { JS_NewInt32(self.context, value) };
-
-        Ok(value)
+        SerializationError::try_from_value(self.context, value)
     }
 
     fn serialize_i64(self, value: i64) -> Result<Self::Ok, Self::Error> {
@@ -52,8 +52,7 @@ impl<'a> serde::Serializer for Serializer<'a> {
         }
 
         let value = unsafe { JS_NewBigInt64(self.context, value) };
-
-        Ok(value)
+        SerializationError::try_from_value(self.context, value)
     }
 
     // For now we don't support i128 and u128, as there are no methods to create
@@ -83,22 +82,16 @@ impl<'a> serde::Serializer for Serializer<'a> {
         }
 
         let value = unsafe { JS_NewBigUint64(self.context, value) };
-
-        Ok(value)
+        SerializationError::try_from_value(self.context, value)
     }
 
     fn serialize_f32(self, value: f32) -> Result<Self::Ok, Self::Error> {
-        let value = unsafe { JS_NewFloat64(self.context, f64::from(value)) };
-
-        if JS_IsException(value) {
-            return Err(());
-        }
-
-        Ok(value)
+        self.serialize_f64(f64::from(value))
     }
 
     fn serialize_f64(self, value: f64) -> Result<Self::Ok, Self::Error> {
-        todo!()
+        let value = unsafe { JS_NewFloat64(self.context, value) };
+        SerializationError::try_from_value(self.context, value)
     }
 
     fn serialize_char(self, value: char) -> Result<Self::Ok, Self::Error> {
