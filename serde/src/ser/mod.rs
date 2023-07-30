@@ -3,31 +3,26 @@ mod map;
 use std::ffi::{CStr, CString};
 
 use libquickjs_sys::{
-    size_t, JSContext, JSValue, JS_AtomToValue, JS_DupValue, JS_FreeContext, JS_IsException,
+    size_t, JSValue, JS_AtomToValue, JS_DupValue, JS_FreeContext, JS_IsException,
     JS_NewArrayBufferCopy, JS_NewAtom, JS_NewBigInt64, JS_NewBigUint64, JS_NewBool, JS_NewFloat64,
     JS_NewInt32, JS_NewStringLen, JS_ATOM_NULL,
 };
 use serde::Serialize;
 
+use crate::context::Context;
 use crate::errors::{Internal, SerializationError};
 
-pub struct Serializer {
-    context: *mut JSContext,
+pub struct Serializer<'a> {
+    context: &'a mut Context,
 }
 
-impl Serializer {
-    pub fn new(context: *mut JSContext) -> Self {
+impl<'a> Serializer<'a> {
+    pub fn new(context: &'a mut Context) -> Self {
         Self { context }
     }
 }
 
-impl Drop for Serializer {
-    fn drop(&mut self) {
-        unsafe { JS_FreeContext(self.context) };
-    }
-}
-
-impl serde::Serializer for Serializer {
+impl<'a> serde::Serializer for Serializer<'a> {
     type Error = SerializationError;
     type Ok = JSValue;
     type SerializeMap = ();
@@ -38,9 +33,9 @@ impl serde::Serializer for Serializer {
     type SerializeTupleStruct = ();
     type SerializeTupleVariant = ();
 
-    fn serialize_bool(self, value: bool) -> Result<Self::Ok, Self::Error> {
-        let value = unsafe { JS_NewBool(self.context, value) };
-        SerializationError::try_from_value(self.context, value)
+    fn serialize_bool(mut self, value: bool) -> Result<Self::Ok, Self::Error> {
+        let value = unsafe { JS_NewBool(self.context.as_mut_ptr(), value) };
+        SerializationError::try_from_value(self.context.as_mut_ptr(), value)
     }
 
     fn serialize_i8(self, value: i8) -> Result<Self::Ok, Self::Error> {
@@ -51,19 +46,19 @@ impl serde::Serializer for Serializer {
         self.serialize_i32(i32::from(value))
     }
 
-    fn serialize_i32(self, value: i32) -> Result<Self::Ok, Self::Error> {
-        let value = unsafe { JS_NewInt32(self.context, value) };
-        SerializationError::try_from_value(self.context, value)
+    fn serialize_i32(mut self, value: i32) -> Result<Self::Ok, Self::Error> {
+        let value = unsafe { JS_NewInt32(self.context.as_mut_ptr(), value) };
+        SerializationError::try_from_value(self.context.as_mut_ptr(), value)
     }
 
-    fn serialize_i64(self, value: i64) -> Result<Self::Ok, Self::Error> {
+    fn serialize_i64(mut self, value: i64) -> Result<Self::Ok, Self::Error> {
         // try to fit the value into a 32-bit integer, otherwise return a BigInt
         if let Ok(value) = i32::try_from(value) {
             return self.serialize_i32(value);
         }
 
-        let value = unsafe { JS_NewBigInt64(self.context, value) };
-        SerializationError::try_from_value(self.context, value)
+        let value = unsafe { JS_NewBigInt64(self.context.as_mut_ptr(), value) };
+        SerializationError::try_from_value(self.context.as_mut_ptr(), value)
     }
 
     // For now we don't support i128 and u128, as there are no methods to create
@@ -85,24 +80,24 @@ impl serde::Serializer for Serializer {
         self.serialize_u64(u64::from(value))
     }
 
-    fn serialize_u64(self, value: u64) -> Result<Self::Ok, Self::Error> {
+    fn serialize_u64(mut self, value: u64) -> Result<Self::Ok, Self::Error> {
         // try to fit the value into a 32-bit integer, otherwise return a BigInt
         // we could also call `serialize_u64` instead, but that is largely redundant.
         if let Ok(value) = i32::try_from(value) {
             return self.serialize_i32(value);
         }
 
-        let value = unsafe { JS_NewBigUint64(self.context, value) };
-        SerializationError::try_from_value(self.context, value)
+        let value = unsafe { JS_NewBigUint64(self.context.as_mut_ptr(), value) };
+        SerializationError::try_from_value(self.context.as_mut_ptr(), value)
     }
 
     fn serialize_f32(self, value: f32) -> Result<Self::Ok, Self::Error> {
         self.serialize_f64(f64::from(value))
     }
 
-    fn serialize_f64(self, value: f64) -> Result<Self::Ok, Self::Error> {
-        let value = unsafe { JS_NewFloat64(self.context, value) };
-        SerializationError::try_from_value(self.context, value)
+    fn serialize_f64(mut self, value: f64) -> Result<Self::Ok, Self::Error> {
+        let value = unsafe { JS_NewFloat64(self.context.as_mut_ptr(), value) };
+        SerializationError::try_from_value(self.context.as_mut_ptr(), value)
     }
 
     fn serialize_char(self, value: char) -> Result<Self::Ok, Self::Error> {
@@ -115,8 +110,14 @@ impl serde::Serializer for Serializer {
     fn serialize_str(self, value: &str) -> Result<Self::Ok, Self::Error> {
         let c_str = CString::new(value).map_err(Internal::from)?;
 
-        let value = unsafe { JS_NewStringLen(self.context, c_str.as_ptr(), value.len() as size_t) };
-        SerializationError::try_from_value(self.context, value)
+        let value = unsafe {
+            JS_NewStringLen(
+                self.context.as_mut_ptr(),
+                c_str.as_ptr(),
+                value.len() as size_t,
+            )
+        };
+        SerializationError::try_from_value(self.context.as_mut_ptr(), value)
     }
 
     fn serialize_bytes(self, value: &[u8]) -> Result<Self::Ok, Self::Error> {
@@ -124,9 +125,10 @@ impl serde::Serializer for Serializer {
         // _a lot_ more complicated.
         let length = value.len();
 
-        let value =
-            unsafe { JS_NewArrayBufferCopy(self.context, value.as_ptr(), length as size_t) };
-        SerializationError::try_from_value(self.context, value)
+        let value = unsafe {
+            JS_NewArrayBufferCopy(self.context.as_mut_ptr(), value.as_ptr(), length as size_t)
+        };
+        SerializationError::try_from_value(self.context.as_mut_ptr(), value)
     }
 
     fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
@@ -144,8 +146,8 @@ impl serde::Serializer for Serializer {
         // Unit corresponds to `null` in JS
 
         // TODO: I have no idea if this is correct (AtomToValue)
-        let value = unsafe { JS_AtomToValue(self.context, JS_ATOM_NULL) };
-        SerializationError::try_from_value(self.context, value)
+        let value = unsafe { JS_AtomToValue(self.context.as_mut_ptr(), JS_ATOM_NULL) };
+        SerializationError::try_from_value(self.context.as_mut_ptr(), value)
     }
 
     fn serialize_unit_struct(self, _: &'static str) -> Result<Self::Ok, Self::Error> {
