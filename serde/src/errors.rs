@@ -76,6 +76,8 @@ pub enum SerializationError {
     MissingValue,
     #[error("Expected either a string or a number as a key")]
     InvalidKey,
+    #[error("The serializer is in an invalid state")]
+    InvalidState,
 }
 
 impl SerializationError {

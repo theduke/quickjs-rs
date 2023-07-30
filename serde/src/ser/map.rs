@@ -17,13 +17,14 @@ pub struct SerializeMap<'a> {
 }
 
 impl<'a> SerializeMap<'a> {
-    pub(crate) fn new(context: &'a mut Context) -> Self {
+    pub(crate) fn new(context: &'a mut Context) -> Result<Self, SerializationError> {
         let object = unsafe { JS_NewObject(context.as_mut_ptr()) };
+        let object = SerializationError::try_from_value(context.as_mut_ptr(), object)?;
 
-        Self {
+        Ok(Self {
             context,
             object: Some(object),
-        }
+        })
     }
 
     fn key_to_atom(&mut self, key: JSValue) -> Result<JSAtom, SerializationError> {
@@ -40,7 +41,9 @@ impl<'a> SerializeMap<'a> {
     }
 
     fn insert(&mut self, key: JSValue, value: JSValue) -> Result<(), SerializationError> {
-        let object = self.object.expect("object is not initialized");
+        // IMPORTANT: This is on top, so that we don't need to free the value in case of
+        // an error.
+        let object = self.object.ok_or(SerializationError::InvalidState)?;
 
         let key = self.key_to_atom(key)?;
 
@@ -73,8 +76,7 @@ impl<'a> SerializeMap<'a> {
             self.insert(key, value)?;
         }
 
-        let object = self.object.take().expect("object is not initialized");
-        Ok(object)
+        self.object.take().ok_or(SerializationError::InvalidState)
     }
 }
 
@@ -133,7 +135,6 @@ impl<'a> serde::ser::SerializeMap for SerializeMap<'a> {
         self.insert(key, value)
     }
 
-    // TODO: when does Drop get called? (I hope after this function)
     fn end(mut self) -> Result<Self::Ok, Self::Error> {
         self.finish_object()
     }

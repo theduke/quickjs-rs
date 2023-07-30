@@ -13,14 +13,20 @@ pub struct SerializeSeq<'a> {
 }
 
 impl<'a> SerializeSeq<'a> {
-    pub fn new(context: &'a mut Context) -> Self {
+    pub fn new(context: &'a mut Context) -> Result<Self, SerializationError> {
         let array = unsafe { JS_NewArray(context.as_mut_ptr()) };
+        let array = SerializationError::try_from_value(context.as_mut_ptr(), array)
+            .expect("failed to create array");
 
-        Self {
+        Ok(Self {
             context,
             count: 0,
             array: Some(array),
-        }
+        })
+    }
+
+    pub(crate) fn finish_array(&mut self) -> Result<JSValue, SerializationError> {
+        self.array.take().ok_or(SerializationError::InvalidState)
     }
 }
 
@@ -32,12 +38,15 @@ impl<'a> serde::ser::SerializeSeq for SerializeSeq<'a> {
     where
         T: Serialize,
     {
+        // IMPORTANT: This is on top, so that we don't need to free the value in case of
+        // an error.
+        let array = self.array.ok_or(SerializationError::InvalidState)?;
+
         let value = {
             let serializer = Serializer::new(self.context);
             value.serialize(serializer)?
         };
 
-        let array = self.array.expect("array is not initialized");
         let error =
             unsafe { JS_SetPropertyUint32(self.context.as_mut_ptr(), array, self.count, value) };
 
@@ -55,9 +64,8 @@ impl<'a> serde::ser::SerializeSeq for SerializeSeq<'a> {
         Ok(())
     }
 
-    // TODO: investigate Drop
     fn end(mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(self.array.take().expect("array is not initialized"))
+        self.finish_array()
     }
 }
 
