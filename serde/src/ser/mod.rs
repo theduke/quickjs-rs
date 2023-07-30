@@ -1,16 +1,20 @@
 mod map;
+mod seq;
 
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 
 use libquickjs_sys::{
-    size_t, JSValue, JS_AtomToValue, JS_DupValue, JS_FreeContext, JS_IsException,
-    JS_NewArrayBufferCopy, JS_NewAtom, JS_NewBigInt64, JS_NewBigUint64, JS_NewBool, JS_NewFloat64,
-    JS_NewInt32, JS_NewStringLen, JS_ATOM_NULL,
+    size_t, JSValue, JS_AtomToValue, JS_IsException, JS_NewArrayBufferCopy, JS_NewAtom,
+    JS_NewBigInt64, JS_NewBigUint64, JS_NewBool, JS_NewFloat64, JS_NewInt32, JS_NewStringLen,
+    JS_ATOM_NULL,
 };
+use serde::ser::SerializeMap as _;
 use serde::Serialize;
 
 use crate::context::Context;
 use crate::errors::{Internal, SerializationError};
+use crate::ser::map::SerializeMap;
+use crate::ser::seq::SerializeSeq;
 
 pub struct Serializer<'a> {
     context: &'a mut Context,
@@ -25,9 +29,9 @@ impl<'a> Serializer<'a> {
 impl<'a> serde::Serializer for Serializer<'a> {
     type Error = SerializationError;
     type Ok = JSValue;
-    type SerializeMap = ();
-    type SerializeSeq = ();
-    type SerializeStruct = ();
+    type SerializeMap = SerializeMap<'a>;
+    type SerializeSeq = SerializeSeq<'a>;
+    type SerializeStruct = SerializeMap<'a>;
     type SerializeStructVariant = ();
     type SerializeTuple = ();
     type SerializeTupleStruct = ();
@@ -195,8 +199,8 @@ impl<'a> serde::Serializer for Serializer<'a> {
         serializer.end()
     }
 
-    fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-        todo!()
+    fn serialize_seq(self, _: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
+        Ok(SerializeSeq::new(self.context))
     }
 
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
@@ -221,8 +225,8 @@ impl<'a> serde::Serializer for Serializer<'a> {
         todo!()
     }
 
-    fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
-        todo!()
+    fn serialize_map(self, _: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
+        Ok(SerializeMap::new(self.context))
     }
 
     fn serialize_struct(
@@ -230,7 +234,7 @@ impl<'a> serde::Serializer for Serializer<'a> {
         name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
-        todo!()
+        Ok(SerializeMap::new(self.context))
     }
 
     fn serialize_struct_variant(

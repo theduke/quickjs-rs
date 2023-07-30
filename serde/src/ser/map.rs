@@ -10,7 +10,7 @@ use crate::ser::Serializer;
 
 pub struct SerializeMap<'a> {
     context: &'a mut Context,
-    object: JSValue,
+    object: Option<JSValue>,
 
     pending_key: Option<JSValue>,
     buffer: Vec<(JSValue, JSValue)>,
@@ -20,7 +20,10 @@ impl<'a> SerializeMap<'a> {
     pub(crate) fn new(context: &'a mut Context) -> Self {
         let object = unsafe { JS_NewObject(context.as_mut_ptr()) };
 
-        Self { context, object }
+        Self {
+            context,
+            object: Some(object),
+        }
     }
 
     fn key_to_atom(&mut self, key: JSValue) -> Result<JSAtom, SerializationError> {
@@ -37,9 +40,11 @@ impl<'a> SerializeMap<'a> {
     }
 
     fn insert(&mut self, key: JSValue, value: JSValue) -> Result<(), SerializationError> {
+        let object = self.object.expect("object is not initialized");
+
         let key = self.key_to_atom(key)?;
 
-        let error = unsafe { JS_SetProperty(self.context.as_mut_ptr(), self.object, key, value) };
+        let error = unsafe { JS_SetProperty(self.context.as_mut_ptr(), object, key, value) };
 
         if error == -1 {
             // exception occurred, time to roll back
@@ -114,24 +119,48 @@ impl<'a> serde::ser::SerializeMap for SerializeMap<'a> {
         self.insert(key, value)
     }
 
+    // TODO: when does Drop get called? (I hope after this function)
     fn end(mut self) -> Result<Self::Ok, Self::Error> {
         if self.pending_key.is_some() {
             return Err(SerializationError::MissingValue);
         }
 
         // insert the buffered values
-        for (key, value) in self.buffer {
+        for (key, value) in self.buffer.drain(..) {
             self.insert(key, value)?;
         }
 
-        Ok(self.object)
+        let object = self.object.take().expect("object is not initialized");
+        Ok(object)
+    }
+}
+
+impl<'a> serde::ser::SerializeStruct for SerializeMap<'a> {
+    type Error = SerializationError;
+    type Ok = JSValue;
+
+    fn serialize_field<T: ?Sized>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<(), Self::Error>
+    where
+        T: Serialize,
+    {
+        <Self as serde::ser::SerializeMap>::serialize_entry(self, key, value)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        <Self as serde::ser::SerializeMap>::end(self)
     }
 }
 
 impl Drop for SerializeMap<'_> {
     fn drop(&mut self) {
         // free the object
-        unsafe { JS_FreeValue(self.context.as_mut_ptr(), self.object) };
+        if let Some(object) = self.object.take() {
+            unsafe { JS_FreeValue(self.context.as_mut_ptr(), object) };
+        }
 
         // free the pending key
         if let Some(key) = self.pending_key.take() {
