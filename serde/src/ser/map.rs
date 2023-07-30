@@ -9,7 +9,7 @@ use crate::errors::SerializationError;
 use crate::ser::Serializer;
 
 pub struct SerializeMap<'a> {
-    context: &'a mut Context,
+    pub(crate) context: &'a mut Context,
     object: Option<JSValue>,
 
     pending_key: Option<JSValue>,
@@ -61,6 +61,20 @@ impl<'a> SerializeMap<'a> {
         unsafe { JS_FreeAtom(self.context.as_mut_ptr(), key) };
 
         Ok(())
+    }
+
+    pub(crate) fn finish_object(&mut self) -> Result<JSValue, SerializationError> {
+        if self.pending_key.is_some() {
+            return Err(SerializationError::MissingValue);
+        }
+
+        // insert the buffered values
+        for (key, value) in self.buffer.drain(..) {
+            self.insert(key, value)?;
+        }
+
+        let object = self.object.take().expect("object is not initialized");
+        Ok(object)
     }
 }
 
@@ -121,17 +135,7 @@ impl<'a> serde::ser::SerializeMap for SerializeMap<'a> {
 
     // TODO: when does Drop get called? (I hope after this function)
     fn end(mut self) -> Result<Self::Ok, Self::Error> {
-        if self.pending_key.is_some() {
-            return Err(SerializationError::MissingValue);
-        }
-
-        // insert the buffered values
-        for (key, value) in self.buffer.drain(..) {
-            self.insert(key, value)?;
-        }
-
-        let object = self.object.take().expect("object is not initialized");
-        Ok(object)
+        self.finish_object()
     }
 }
 

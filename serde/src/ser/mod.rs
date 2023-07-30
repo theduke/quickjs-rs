@@ -1,5 +1,6 @@
 mod map;
 mod seq;
+mod variant;
 
 use std::ffi::CString;
 
