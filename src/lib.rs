@@ -310,7 +310,19 @@ impl Context {
         Ok(())
     }
 
-    /// TODO
+    /// Set a global variable using serde serialization.
+    ///
+    /// ```rust
+    /// use quick_js::{Context, JsValue};
+    /// let context = Context::new().unwrap();
+    ///
+    /// context.set_global_serde("someGlobalVariable", &42).unwrap();
+    /// let value = context.eval_as::<i32>("someGlobalVariable").unwrap();
+    /// assert_eq!(
+    ///    value,
+    ///    42,
+    /// );
+    /// ```
     #[cfg(feature = "serde")]
     pub fn set_global_serde<V>(&self, name: &str, value: &V) -> Result<(), ExecutionError>
     where

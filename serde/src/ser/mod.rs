@@ -5,8 +5,9 @@ mod variant;
 use std::ffi::CString;
 
 use libquickjs_sys::{
-    size_t, JSValue, JS_AtomToValue, JS_NewArrayBufferCopy, JS_NewBigInt64, JS_NewBigUint64,
-    JS_NewBool, JS_NewFloat64, JS_NewInt32, JS_NewStringLen, JS_ATOM_NULL,
+    size_t, JSValue, JSValueUnion, JS_AtomToValue, JS_DupAtom, JS_NewArrayBufferCopy,
+    JS_NewBigInt64, JS_NewBigUint64, JS_NewBool, JS_NewFloat64, JS_NewInt32, JS_NewStringLen,
+    JS_ATOM_NULL, JS_TAG_NULL,
 };
 use serde::ser::SerializeMap as _;
 use serde::Serialize;
@@ -66,6 +67,14 @@ impl<'a> serde::Serializer for Serializer<'a> {
         SerializationError::try_from_value(self.context.as_mut_ptr(), value)
     }
 
+    fn serialize_i128(self, value: i128) -> Result<Self::Ok, Self::Error> {
+        if let Ok(value) = i64::try_from(value) {
+            return self.serialize_i64(value);
+        }
+
+        return Err(SerializationError::IntTooLarge);
+    }
+
     // For now we don't support i128 and u128, as there are no methods to create
     // BigInts for them.
     // In theory we could create our own function to do so, but for now that's
@@ -94,6 +103,14 @@ impl<'a> serde::Serializer for Serializer<'a> {
 
         let value = unsafe { JS_NewBigUint64(self.context.as_mut_ptr(), value) };
         SerializationError::try_from_value(self.context.as_mut_ptr(), value)
+    }
+
+    fn serialize_u128(self, value: u128) -> Result<Self::Ok, Self::Error> {
+        if let Ok(value) = u64::try_from(value) {
+            return self.serialize_u64(value);
+        }
+
+        Err(SerializationError::IntTooLarge)
     }
 
     fn serialize_f32(self, value: f32) -> Result<Self::Ok, Self::Error> {
@@ -150,9 +167,13 @@ impl<'a> serde::Serializer for Serializer<'a> {
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
         // Unit corresponds to `null` in JS
 
-        // TODO: I have no idea if this is correct (AtomToValue)
-        let value = unsafe { JS_AtomToValue(self.context.as_mut_ptr(), JS_ATOM_NULL) };
-        SerializationError::try_from_value(self.context.as_mut_ptr(), value)
+        // Taken from: https://docs.rs/quickjs_runtime/latest/src/quickjs_runtime/quickjs_utils/mod.rs.html#46-51
+        let null = JSValue {
+            u: JSValueUnion { int32: 0 },
+            tag: i64::from(JS_TAG_NULL),
+        };
+
+        Ok(null)
     }
 
     fn serialize_unit_struct(self, _: &'static str) -> Result<Self::Ok, Self::Error> {

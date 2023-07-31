@@ -76,6 +76,8 @@ pub enum SerializationError {
     InvalidKey,
     #[error("The serializer is in an invalid state")]
     InvalidState,
+    #[error("The number is too large to be represented")]
+    IntTooLarge,
 }
 
 impl SerializationError {

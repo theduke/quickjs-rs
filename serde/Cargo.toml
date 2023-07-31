@@ -10,3 +10,7 @@ libquickjs-sys = { path = "../libquickjs-sys" }
 
 serde = "1"
 thiserror = "1"
+
+[dev-dependencies]
+quick-js = { path = "..", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
