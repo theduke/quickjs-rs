@@ -1,5 +1,3 @@
-use std::mem;
-
 use libquickjs_sys::{
     JSAtom, JSValue, JS_FreeAtom, JS_FreeValue, JS_NewObject, JS_SetProperty, JS_ValueToAtom,
     JS_ATOM_NULL,

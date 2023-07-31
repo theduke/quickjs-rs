@@ -5,9 +5,8 @@ mod variant;
 use std::ffi::CString;
 
 use libquickjs_sys::{
-    size_t, JSValue, JSValueUnion, JS_AtomToValue, JS_DupAtom, JS_NewArrayBufferCopy,
-    JS_NewBigInt64, JS_NewBigUint64, JS_NewBool, JS_NewFloat64, JS_NewInt32, JS_NewStringLen,
-    JS_ATOM_NULL, JS_TAG_NULL,
+    size_t, JSValue, JSValueUnion, JS_NewArrayBufferCopy, JS_NewBigInt64, JS_NewBigUint64,
+    JS_NewBool, JS_NewFloat64, JS_NewInt32, JS_NewStringLen, JS_TAG_NULL,
 };
 use serde::ser::SerializeMap as _;
 use serde::Serialize;
