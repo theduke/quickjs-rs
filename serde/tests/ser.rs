@@ -1,5 +1,21 @@
-use quick_js::Context;
-use serde::Serialize;
+use std::collections::BTreeMap;
+use std::marker::PhantomData;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use quick_js::{Context, ExecutionError};
+use serde::ser::{Error, SerializeMap};
+use serde::{Serialize, Serializer};
+
+fn run_serialize_error<T>(value: &T) -> ExecutionError
+where
+    T: Serialize,
+{
+    let context = Context::new().unwrap();
+
+    let result = context.set_global_serde("example", value);
+
+    result.expect_err("serialization should fail")
+}
 
 fn run<T>(value: &T) -> String
 where
@@ -231,15 +247,232 @@ fn enum_with_lifetime_and_lifetime_in_type() {
     enum Enum<'a> {
         A { a: &'a str },
         B { b: &'a str },
-        C(std::marker::PhantomData<&'a ()>),
+        C(PhantomData<&'a ()>),
     }
 
     assert_eq!(run(&Enum::A { a: "abc" }), r#"{"A":{"a":"abc"}}"#);
     assert_eq!(run(&Enum::B { b: "def" }), r#"{"B":{"b":"def"}}"#);
 }
 
-// TODO: sequence failure of element
-// TODO: map failure of key
-// TODO: map failure of value
-// TODO: map do not supply value
-// TODO: map supply extra key
+#[test]
+fn vec_element_error() {
+    struct Element;
+
+    static COUNT: AtomicUsize = AtomicUsize::new(0);
+
+    impl Serialize for Element {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let next = COUNT.fetch_add(1, Ordering::SeqCst);
+
+            if next == 1 {
+                Err(Error::custom("failure"))
+            } else {
+                next.serialize(serializer)
+            }
+        }
+    }
+
+    assert_eq!(
+        run_serialize_error(&vec![Element, Element, Element]),
+        ExecutionError::Serialize
+    );
+}
+
+#[test]
+fn map_key_error() {
+    struct Key;
+
+    impl Serialize for Key {
+        fn serialize<S>(&self, _: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Err(Error::custom("failure"))
+        }
+    }
+
+    struct Map;
+
+    impl Serialize for Map {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut map = serializer.serialize_map(Some(1))?;
+            map.serialize_key(&Key)?;
+            map.serialize_value(&5u8)?;
+            map.end()
+        }
+    }
+
+    assert_eq!(run_serialize_error(&Map), ExecutionError::Serialize);
+}
+
+#[test]
+fn map_value_error() {
+    struct Value;
+
+    impl Serialize for Value {
+        fn serialize<S>(&self, _: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Err(Error::custom("failure"))
+        }
+    }
+
+    struct Map;
+
+    impl Serialize for Map {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut map = serializer.serialize_map(Some(1))?;
+            map.serialize_key(&5u8)?;
+            map.serialize_value(&Value)?;
+            map.end()
+        }
+    }
+
+    assert_eq!(run_serialize_error(&Map), ExecutionError::Serialize);
+}
+
+#[test]
+fn map_entry_key_error() {
+    struct Key;
+
+    impl Serialize for Key {
+        fn serialize<S>(&self, _: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Err(Error::custom("failure"))
+        }
+    }
+
+    struct Map;
+
+    impl Serialize for Map {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut map = serializer.serialize_map(Some(1))?;
+            map.serialize_entry(&Key, &5u8)?;
+            map.end()
+        }
+    }
+
+    assert_eq!(run_serialize_error(&Map), ExecutionError::Serialize);
+}
+
+#[test]
+fn map_entry_value_error() {
+    struct Value;
+
+    impl Serialize for Value {
+        fn serialize<S>(&self, _: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Err(Error::custom("failure"))
+        }
+    }
+
+    struct Map;
+
+    impl Serialize for Map {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut map = serializer.serialize_map(Some(1))?;
+            map.serialize_entry(&5u8, &Value)?;
+            map.end()
+        }
+    }
+
+    assert_eq!(run_serialize_error(&Map), ExecutionError::Serialize);
+}
+
+#[test]
+fn map_entry_error() {
+    struct Key;
+
+    impl Serialize for Key {
+        fn serialize<S>(&self, _: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Err(Error::custom("failure"))
+        }
+    }
+
+    struct Value;
+
+    impl Serialize for Value {
+        fn serialize<S>(&self, _: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Err(Error::custom("failure"))
+        }
+    }
+
+    struct Map;
+
+    impl Serialize for Map {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut map = serializer.serialize_map(Some(1))?;
+            map.serialize_entry(&Key, &Value)?;
+            map.end()
+        }
+    }
+
+    assert_eq!(run_serialize_error(&Map), ExecutionError::Serialize);
+}
+
+#[test]
+fn map_no_corresponding_value_error() {
+    struct Map;
+
+    impl Serialize for Map {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut map = serializer.serialize_map(Some(1))?;
+            map.serialize_key(&5u8)?;
+            map.end()
+        }
+    }
+
+    assert_eq!(run_serialize_error(&Map), ExecutionError::Serialize);
+}
+
+#[test]
+fn map_extra_value_error() {
+    struct Map;
+
+    impl Serialize for Map {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut map = serializer.serialize_map(Some(1))?;
+            map.serialize_key(&5u8)?;
+            map.serialize_value(&5u8)?;
+            map.serialize_value(&5u8)?;
+            map.end()
+        }
+    }
+
+    assert_eq!(run_serialize_error(&Map), ExecutionError::Serialize);
+}
