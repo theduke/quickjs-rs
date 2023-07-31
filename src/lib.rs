@@ -1,7 +1,8 @@
 //! quick-js is a a Rust wrapper for [QuickJS](https://bellard.org/quickjs/), a new Javascript
 //! engine by Fabrice Bellard.
 //!
-//! It enables easy and straight-forward execution of modern Javascript from Rust.
+//! It enables easy and straight-forward execution of modern Javascript from
+//! Rust.
 //!
 //! ## Limitations
 //!
@@ -42,12 +43,12 @@ mod value;
 #[cfg(test)]
 mod tests;
 
-use std::{convert::TryFrom, error, fmt};
+use std::convert::TryFrom;
+use std::{error, fmt};
 
-pub use self::{
-    callback::{Arguments, Callback},
-    value::*,
-};
+pub use self::callback::{Arguments, Callback};
+pub use self::value::*;
+use crate::bindings::OwnedJsValue;
 
 /// Error on Javascript execution.
 #[derive(PartialEq, Debug)]
@@ -62,6 +63,9 @@ pub enum ExecutionError {
     Exception(JsValue),
     /// JS Runtime exceeded the memory limit.
     OutOfMemory,
+    // TODO: temp
+    /// Serialization Error
+    Serialize,
     #[doc(hidden)]
     __NonExhaustive,
 }
@@ -74,6 +78,7 @@ impl fmt::Display for ExecutionError {
             Conversion(e) => e.fmt(f),
             Internal(e) => write!(f, "Internal error: {}", e),
             Exception(e) => write!(f, "{:?}", e),
+            Serialize => write!(f, "Serialization error"),
             OutOfMemory => write!(f, "Out of memory: runtime memory limit exceeded"),
             __NonExhaustive => unreachable!(),
         }
@@ -182,7 +187,8 @@ impl Context {
         Self { wrapper }
     }
 
-    /// Create a `ContextBuilder` that allows customization of JS Runtime settings.
+    /// Create a `ContextBuilder` that allows customization of JS Runtime
+    /// settings.
     ///
     /// For details, see the methods on `ContextBuilder`.
     ///
@@ -304,6 +310,34 @@ impl Context {
         Ok(())
     }
 
+    /// Set a global variable using serde serialization.
+    ///
+    /// ```rust
+    /// use quick_js::{Context, JsValue};
+    /// let context = Context::new().unwrap();
+    ///
+    /// context.set_global_serde("someGlobalVariable", &42).unwrap();
+    /// let value = context.eval_as::<i32>("someGlobalVariable").unwrap();
+    /// assert_eq!(
+    ///    value,
+    ///    42,
+    /// );
+    /// ```
+    #[cfg(feature = "serde")]
+    pub fn set_global_serde<V>(&self, name: &str, value: &V) -> Result<(), ExecutionError>
+    where
+        V: serde::Serialize,
+    {
+        let global = self.wrapper.global()?;
+
+        let mut context = quick_js_serde::Context::new_without_drop(self.wrapper.context);
+        let value = quick_js_serde::serialize(value, &mut context)
+            .map_err(|_| ExecutionError::Serialize)?;
+        let value = OwnedJsValue::new(&self.wrapper, value);
+
+        global.set_property(name, value)
+    }
+
     /// Call a global function in the Javascript namespace.
     ///
     /// **Promises**:
@@ -348,8 +382,8 @@ impl Context {
     /// * must return a value
     /// * the return value must either:
     ///   - be convertible to JsValue
-    ///   - be a Result<T, E> where T is convertible to JsValue
-    ///     if Err(e) is returned, a Javascript exception will be raised
+    ///   - be a Result<T, E> where T is convertible to JsValue if Err(e) is
+    ///     returned, a Javascript exception will be raised
     ///
     /// ```rust
     /// use quick_js::{Context, JsValue};
